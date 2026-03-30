@@ -768,18 +768,18 @@
       (function () {
         /* ── Palette ──────────────────────────────── */
         const COLORS = [
-          "#00e5c8",
-          "#ff6b6b",
-          "#ffd93d",
-          "#6bde8a",
-          "#c084fc",
-          "#ff9f43",
-          "#45aaf2",
-          "#fd79a8",
-          "#a29bfe",
-          "#ffeaa7",
-          "#74b9ff",
-          "#fab1a0",
+          "#00e5c8", // teal
+          "#ff5555", // red
+          "#f1c232", // gold
+          "#36d989", // green
+          "#b06cff", // purple
+          "#ff9f1a", // orange
+          "#2196f3", // blue
+          "#ff4da6", // pink
+          "#e0e0e0", // silver
+          "#00bcd4", // cyan
+          "#ff6e40", // deep orange
+          "#8bc34a", // lime
         ];
 
         const MAX_COMMITS = 20;
@@ -809,7 +809,7 @@
             fixed: { grid_type: "tripolar", size: "360×180×50", float_type: "Float64", closure: "CATKE" },
           },
           "Grid Type Sweep": {
-            text: "Tripolar vs latitude-longitude grids, with and without z-star coordinates and immersed boundaries.",
+            text: "Tripolar vs latitude-longitude grids, with and without z-star coordinates and immersed boundaries. Dashed lines indicate z-star variants.",
             swept: "grid_type, zstar_coordinate",
             fixed: { size: "360×180×50", float_type: "Float64", momentum_advection: "WENOVectorInvariantDefault", tracer_advection: "WENO7", closure: "CATKE" },
           },
@@ -1156,10 +1156,23 @@
           const datasets = [];
           const variantIndices = new Map();
 
+          // Build color map: zstar variants share color with their base
+          const colorMap = new Map();
+          let colorIdx = 0;
+          for (const name of variantNames) {
+            const base = name.replace(/_?zstar$/, "");
+            if (!colorMap.has(base)) {
+              colorMap.set(base, COLORS[colorIdx % COLORS.length]);
+              colorIdx++;
+            }
+          }
+
           variantNames.forEach((name, i) => {
             const results = variantMap.get(name);
             const commitMap = new Map(results.map((r) => [r.commit.id, r]));
-            const color = COLORS[i % COLORS.length];
+            const isZstar = /(_?zstar)$/.test(name);
+            const base = name.replace(/_?zstar$/, "");
+            const color = colorMap.get(base) || COLORS[i % COLORS.length];
 
             datasets.push({
               label: cleanKernel(name.trim()),
@@ -1174,6 +1187,7 @@
               pointRadius: 3,
               pointHoverRadius: 6,
               borderWidth: 2,
+              borderDash: isZstar ? [6, 3] : [],
               tension: 0,
               spanGaps: true,
               fill: datasets.length === 0,
