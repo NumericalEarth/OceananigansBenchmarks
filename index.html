@@ -475,6 +475,53 @@
         font-size: 0.7rem;
         opacity: 0.5;
       }
+      .commit-link {
+        color: var(--biolum-dim);
+        text-decoration: none;
+        cursor: pointer;
+        position: relative;
+      }
+      .commit-link:hover {
+        color: var(--biolum);
+      }
+      .commit-popover {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        background: var(--deep);
+        border: 1px solid var(--current);
+        border-radius: 8px;
+        padding: 0.75rem 1rem;
+        min-width: 280px;
+        max-width: 400px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 229, 200, 0.1);
+      }
+      .commit-popover.visible {
+        display: block;
+      }
+      .commit-popover-title {
+        font-family: var(--font-body);
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--white);
+        margin-bottom: 0.4rem;
+        line-height: 1.35;
+      }
+      .commit-popover-meta {
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        color: var(--foam);
+        margin-bottom: 0.5rem;
+      }
+      .commit-popover-link {
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        color: var(--biolum);
+        text-decoration: none;
+      }
+      .commit-popover-link:hover {
+        text-decoration: underline;
+      }
       @media (max-width: 768px) {
         .chart-pair {
           flex-direction: column;
@@ -949,7 +996,10 @@
           for (let i = sorted.length - 1; i >= 0; i--) {
             const c = sorted[i];
             const sha = c.id.slice(0, 7);
-            html += `<tr><td>${sha}</td>`;
+            const msg = (c.commit.message || "").split("\n")[0];
+            const author = c.commit.author ? c.commit.author.username || c.commit.author.name : "";
+            const url = c.commit.url || "";
+            html += `<tr><td><a class="commit-link" data-msg="${msg.replace(/"/g, '&quot;')}" data-author="${author}" data-url="${url}">${sha}</a></td>`;
             for (const name of variantNames) {
               const val = lookup.get(name).get(c.id);
               const prev =
@@ -1176,6 +1226,47 @@
 
         /* ── Go ───────────────────────────────────── */
         render(init());
+
+        /* ── Commit popover ───────────────────────── */
+        const popover = document.createElement("div");
+        popover.className = "commit-popover";
+        document.body.appendChild(popover);
+
+        document.addEventListener("click", (e) => {
+          const link = e.target.closest(".commit-link");
+          if (!link) {
+            popover.classList.remove("visible");
+            return;
+          }
+          e.preventDefault();
+          const msg = link.dataset.msg;
+          const author = link.dataset.author;
+          const url = link.dataset.url;
+
+          popover.innerHTML = `
+            <div class="commit-popover-title">${msg}</div>
+            <div class="commit-popover-meta">by @${author}</div>
+            ${url ? `<a class="commit-popover-link" href="${url}" target="_blank" rel="noopener">View commit →</a>` : ""}
+          `;
+
+          const rect = link.getBoundingClientRect();
+          let top = rect.bottom + 6;
+          let left = rect.left;
+
+          popover.classList.add("visible");
+
+          // Keep within viewport
+          const pRect = popover.getBoundingClientRect();
+          if (left + pRect.width > window.innerWidth - 16) {
+            left = window.innerWidth - pRect.width - 16;
+          }
+          if (top + pRect.height > window.innerHeight - 16) {
+            top = rect.top - pRect.height - 6;
+          }
+
+          popover.style.top = `${top}px`;
+          popover.style.left = `${left}px`;
+        });
       })();
     </script>
   </body>
