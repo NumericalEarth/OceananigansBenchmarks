@@ -1,684 +1,1181 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, minimum-scale=1.0, initial-scale=1, user-scalable=yes"
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Oceananigans.jl — Performance Dashboard</title>
+
+    <!-- Fonts: Playfair Display for headings, JetBrains Mono for data, Source Sans 3 for body -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
+      href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=JetBrains+Mono:wght@400;500&family=Source+Sans+3:wght@300;400;500;600&display=swap"
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/modern-normalize@2.0.0/modern-normalize.min.css"
     />
+
     <style>
+      /* ── Design tokens ─────────────────────────────── */
+      :root {
+        --abyss: #0a0e17;
+        --deep: #0f1523;
+        --trench: #141c2e;
+        --slate: #1b2540;
+        --current: #243156;
+        --surface: #2d3d6b;
+        --foam: #8fa4d0;
+        --light: #c4d2ee;
+        --white: #eaf0ff;
+        --biolum: #00e5c8;
+        --biolum-dim: #00b89e;
+        --coral: #ff6b6b;
+        --gold: #ffd93d;
+        --kelp: #6bde8a;
+        --jellyfish: #c084fc;
+        --font-display: "Playfair Display", Georgia, serif;
+        --font-body: "Source Sans 3", system-ui, sans-serif;
+        --font-mono: "JetBrains Mono", "Fira Code", monospace;
+        --chart-colors: #00e5c8, #ff6b6b, #ffd93d, #6bde8a, #c084fc, #ff9f43,
+          #45aaf2, #fd79a8, #a29bfe, #ffeaa7, #dfe6e9, #74b9ff;
+      }
+
+      /* ── Reset & base ──────────────────────────────── */
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
       html {
-        font-family: BlinkMacSystemFont, -apple-system, "Segoe UI",
-          Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans",
-          "Helvetica Neue", Helvetica, Arial, sans-serif;
-        -webkit-font-smoothing: antialiased;
-        background-color: #fff;
-        font-size: 14px;
+        font-size: 15px;
+        scroll-behavior: smooth;
+        background: var(--abyss);
       }
       body {
-        color: #4a4a4a;
-        margin: 4px;
-        font-size: 1em;
-        font-weight: 400;
-        line-height: 1.2;
+        font-family: var(--font-body);
+        color: var(--light);
+        background: var(--abyss);
+        line-height: 1.55;
+        -webkit-font-smoothing: antialiased;
+        min-height: 100vh;
       }
-      header {
-        margin-bottom: 4px;
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
+
+      /* ── Noise texture overlay ─────────────────────── */
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        opacity: 0.03;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        background-size: 256px;
+        pointer-events: none;
+        z-index: 9999;
       }
-      .header-item {
-        font-size: 0.9em;
-        line-height: 1.2;
+
+      /* ── Animations ────────────────────────────────── */
+      @keyframes fadeUp {
+        from {
+          opacity: 0;
+          transform: translateY(24px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
       }
-      .header-label {
-        margin-right: 4px;
+      @keyframes glow {
+        0%,
+        100% {
+          opacity: 0.6;
+        }
+        50% {
+          opacity: 1;
+        }
       }
-      main {
+      @keyframes waveShift {
+        0% {
+          transform: translateX(0);
+        }
+        100% {
+          transform: translateX(-50%);
+        }
+      }
+      @keyframes statCount {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .fade-up {
+        animation: fadeUp 0.6s ease-out both;
+      }
+
+      /* ── Hero header ───────────────────────────────── */
+      .hero {
+        position: relative;
+        padding: 3rem 2rem 2.5rem;
+        background: linear-gradient(
+          170deg,
+          var(--abyss) 0%,
+          var(--deep) 40%,
+          var(--trench) 70%,
+          var(--slate) 100%
+        );
+        overflow: hidden;
+        border-bottom: 1px solid var(--current);
+      }
+      .hero::after {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          var(--biolum),
+          transparent
+        );
+        opacity: 0.4;
+      }
+
+      /* Wave decoration */
+      .wave-container {
+        position: absolute;
+        bottom: -2px;
+        left: 0;
+        width: 200%;
+        height: 40px;
+        opacity: 0.08;
+        animation: waveShift 18s linear infinite;
+      }
+      .wave-container svg {
         width: 100%;
-        display: flex;
-        flex-direction: column;
+        height: 100%;
       }
-      a {
-        color: #3273dc;
-        cursor: pointer;
-        text-decoration: none;
+
+      .hero-content {
+        max-width: 95vw;
+        margin: 0 auto;
+        position: relative;
+        z-index: 1;
       }
-      a:hover {
-        color: #000;
+      .hero-title {
+        font-family: var(--font-display);
+        font-weight: 900;
+        font-size: clamp(2rem, 5vw, 3.2rem);
+        color: var(--white);
+        letter-spacing: -0.02em;
+        line-height: 1.1;
+        margin-bottom: 0.15em;
       }
-      button {
-        color: #fff;
-        background-color: #3298dc;
-        border-color: transparent;
-        cursor: pointer;
-        text-align: center;
-        padding: 4px 8px;
-        border-radius: 3px;
-        font-size: 0.9em;
+      .hero-title span {
+        color: var(--biolum);
+        position: relative;
       }
-      button:hover {
-        background-color: #2793da;
-        flex: none;
+      .hero-title span::after {
+        content: "";
+        position: absolute;
+        bottom: 2px;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: var(--biolum);
+        opacity: 0.3;
+        border-radius: 1px;
       }
-      .spacer {
-        flex: auto;
+      .hero-subtitle {
+        font-family: var(--font-body);
+        font-weight: 300;
+        font-size: clamp(0.95rem, 2vw, 1.15rem);
+        color: var(--foam);
+        max-width: 600px;
+        margin-top: 0.5rem;
+        line-height: 1.5;
       }
-      .small {
-        font-size: 0.75rem;
-      }
-      footer {
-        margin-top: 8px;
-        display: flex;
-        align-items: center;
-      }
-      .benchmarks-container {
-        width: 100%;
-      }
-      .table-of-contents {
-        margin: 16px 0 24px 0;
-        padding: 16px;
-        background-color: #f8f9fa;
-        border: 1px solid #e9ecef;
-        border-radius: 8px;
-      }
-      .toc-header {
-        font-size: 20px;
-        font-weight: bold;
-        color: #2c3e50;
-        margin: 0 0 12px 0;
-        padding-bottom: 8px;
-        border-bottom: 2px solid #3498db;
-      }
-      .toc-list {
+
+      /* ── Stats bar ─────────────────────────────────── */
+      .stats-bar {
         display: flex;
         flex-wrap: wrap;
-        gap: 8px;
+        gap: 1.5rem;
+        margin-top: 1.8rem;
+        padding-top: 1.2rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
       }
-      .toc-item {
-        display: inline-block;
-        padding: 6px 12px;
-        background-color: #ffffff;
-        color: #3498db;
-        text-decoration: none;
-        border: 1px solid #3498db;
-        border-radius: 4px;
-        font-size: 14px;
+      .stat {
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+        animation: statCount 0.5s ease-out both;
+      }
+      .stat:nth-child(2) {
+        animation-delay: 0.1s;
+      }
+      .stat:nth-child(3) {
+        animation-delay: 0.2s;
+      }
+      .stat:nth-child(4) {
+        animation-delay: 0.3s;
+      }
+      .stat-value {
+        font-family: var(--font-mono);
+        font-size: 1.5rem;
         font-weight: 500;
-        transition: all 0.2s ease;
+        color: var(--biolum);
+        line-height: 1;
       }
-      .toc-item:hover {
-        background-color: #3498db;
-        color: #ffffff;
+      .stat-label {
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: var(--foam);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      /* ── Navigation (TOC) ──────────────────────────── */
+      .nav-section {
+        max-width: 95vw;
+        margin: 0 auto;
+        padding: 1.5rem 2rem;
+        animation: fadeUp 0.6s ease-out 0.2s both;
+      }
+      .nav-label {
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        font-weight: 500;
+        color: var(--foam);
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        margin-bottom: 0.75rem;
+      }
+      .nav-pills {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+      .nav-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.4rem 0.85rem;
+        font-family: var(--font-body);
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: var(--foam);
+        background: var(--trench);
+        border: 1px solid var(--current);
+        border-radius: 100px;
         text-decoration: none;
+        transition: all 0.2s ease;
+        cursor: pointer;
       }
-      .benchmark-section {
-        margin-bottom: 24px;
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        padding: 16px;
-        background-color: #f9f9f9;
+      .nav-pill:hover {
+        color: var(--white);
+        background: var(--slate);
+        border-color: var(--biolum);
+        box-shadow: 0 0 12px rgba(0, 229, 200, 0.15);
       }
-      .benchmark-header {
-        font-size: 18px;
-        font-weight: bold;
-        color: #2c3e50;
-        margin: 0 0 16px 0;
-        padding-bottom: 8px;
-        border-bottom: 2px solid #3498db;
+      .nav-pill .pill-count {
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        color: var(--biolum-dim);
+        opacity: 0.7;
       }
-      .device-section {
-        margin-bottom: 16px;
+      .nav-pill.active {
+        color: var(--abyss);
+        background: var(--biolum);
+        border-color: var(--biolum);
       }
-      .device-header {
-        font-size: 14px;
-        font-weight: 600;
-        color: #34495e;
-        margin: 0 0 8px 0;
-        padding: 4px 8px;
-        background-color: #ecf0f1;
+      .nav-pill.active .pill-count {
+        color: var(--abyss);
+        opacity: 0.6;
+      }
+
+      /* ── Main content ──────────────────────────────── */
+      .content {
+        max-width: 95vw;
+        margin: 0 auto;
+        padding: 0 2rem 3rem;
+      }
+
+      /* ── Benchmark section ─────────────────────────── */
+      .bench-section {
+        margin-bottom: 2.5rem;
+        animation: fadeUp 0.5s ease-out both;
+      }
+      .bench-section-header {
+        display: flex;
+        align-items: baseline;
+        gap: 1rem;
+        margin-bottom: 1rem;
+        padding-bottom: 0.6rem;
+        border-bottom: 1px solid var(--current);
+      }
+      .bench-section-title {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 1.5rem;
+        color: var(--white);
+      }
+      .bench-section-count {
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        color: var(--biolum-dim);
+      }
+      .bench-section-desc {
+        font-size: 0.88rem;
+        color: var(--foam);
+        margin-bottom: 1.25rem;
+        max-width: 700px;
+        line-height: 1.5;
+      }
+
+      /* ── Device block ──────────────────────────────── */
+      .device-block {
+        margin-bottom: 1.5rem;
+      }
+      .device-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        font-weight: 500;
+        color: var(--gold);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        padding: 0.25rem 0.6rem;
+        background: rgba(255, 217, 61, 0.08);
+        border: 1px solid rgba(255, 217, 61, 0.2);
         border-radius: 4px;
-        display: inline-block;
+        margin-bottom: 0.75rem;
       }
-      .device-charts {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(max(200px, 20vw), 1fr));
-        gap: clamp(6px, 1vw, 12px);
-        padding: clamp(4px, 1vw, 8px);
+      .device-tag::before {
+        content: "◆";
+        font-size: 0.5rem;
+      }
+
+      /* ── Chart grid ────────────────────────────────── */
+      .chart-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      /* ── Chart card ────────────────────────────────── */
+      .chart-card {
+        background: var(--deep);
+        border: 1px solid var(--current);
+        border-radius: 10px;
+        padding: 1rem;
+        transition: all 0.25s ease;
+        position: relative;
+        overflow: hidden;
+      }
+      .chart-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: linear-gradient(
+          90deg,
+          var(--biolum),
+          var(--jellyfish),
+          var(--coral)
+        );
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+      .chart-card:hover {
+        border-color: var(--surface);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3),
+          0 0 0 1px rgba(0, 229, 200, 0.05);
+        transform: translateY(-2px);
+      }
+      .chart-card:hover::before {
+        opacity: 1;
+      }
+      .chart-card-title {
+        font-family: var(--font-body);
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: var(--light);
+        text-align: center;
+        margin-bottom: 0.5rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      }
+      .chart-canvas-wrap {
+        width: 100%;
+        height: 320px;
+        position: relative;
+      }
+
+      /* ── Chart + table pair ────────────────────────── */
+      .chart-pair {
+        display: flex;
+        gap: 0.75rem;
+        align-items: stretch;
+      }
+      .chart-pair > .chart-card {
+        flex: 0 0 50%;
+        min-width: 0;
+      }
+      .chart-data-table {
+        flex: 1;
+        min-width: 0;
+        overflow-x: auto;
+        align-self: center;
+      }
+      .chart-data-table table {
+        border-collapse: collapse;
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        white-space: nowrap;
+        width: 100%;
+      }
+      .chart-data-table th {
+        color: var(--foam);
+        font-weight: 500;
+        text-align: left;
+        padding: 0.3rem 0.5rem;
+        border-bottom: 1px solid var(--current);
+      }
+      .chart-data-table td {
+        color: var(--light);
+        text-align: left;
+        padding: 0.3rem 0.5rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      }
+      .chart-data-table td:first-child {
+        color: var(--foam);
+      }
+      .chart-data-table tr:last-child td {
+        border-bottom: none;
+      }
+      .chart-data-table .delta-pos {
+        color: var(--coral);
+        font-size: 0.7rem;
+      }
+      .chart-data-table .delta-neg {
+        color: var(--kelp);
+        font-size: 0.7rem;
+      }
+      .chart-data-table .delta-zero {
+        color: var(--foam);
+        font-size: 0.7rem;
+        opacity: 0.5;
       }
       @media (max-width: 768px) {
-        .device-charts {
+        .chart-pair {
+          flex-direction: column;
+        }
+        .chart-data-table {
+          max-width: 100%;
+        }
+      }
+
+      /* ── Footer ────────────────────────────────────── */
+      .site-footer {
+        max-width: 95vw;
+        margin: 0 auto;
+        padding: 1.5rem 2rem 2rem;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 1rem;
+        border-top: 1px solid var(--current);
+      }
+      .footer-btn {
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        font-weight: 500;
+        color: var(--biolum);
+        background: transparent;
+        border: 1px solid var(--biolum-dim);
+        padding: 0.45rem 1rem;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+      .footer-btn:hover {
+        background: rgba(0, 229, 200, 0.1);
+        box-shadow: 0 0 16px rgba(0, 229, 200, 0.15);
+      }
+      .footer-spacer {
+        flex: 1;
+      }
+      .footer-credit {
+        font-size: 0.75rem;
+        color: var(--foam);
+        opacity: 0.6;
+      }
+      .footer-credit a {
+        color: var(--biolum-dim);
+        text-decoration: none;
+      }
+      .footer-credit a:hover {
+        text-decoration: underline;
+      }
+
+      /* ── Responsive ────────────────────────────────── */
+      @media (max-width: 768px) {
+        .hero {
+          padding: 2rem 1.25rem 2rem;
+        }
+        .nav-section {
+          padding: 1.25rem 1.25rem;
+        }
+        .content {
+          padding: 0 1.25rem 2rem;
+        }
+        .site-footer {
+          padding: 1.25rem;
+        }
+        .stats-bar {
+          gap: 1rem;
+        }
+        .chart-grid {
           grid-template-columns: 1fr;
-          gap: clamp(6px, 1vw, 10px);
-          padding: clamp(3px, 0.5vw, 6px);
         }
-        .benchmark-section {
-          padding: 12px;
-        }
-        .table-of-contents {
-          padding: 12px;
-        }
-        .toc-list {
-          gap: 6px;
-        }
-        .toc-item {
-          padding: 4px 8px;
-          font-size: 13px;
-        }
-        .chartCard {
-          max-width: 95vw;
-          height: clamp(280px, 35vh, 380px);
+        .chart-canvas-wrap {
+          height: 260px;
         }
       }
       @media (max-width: 480px) {
-        .device-charts {
-          grid-template-columns: 1fr;
-          gap: clamp(4px, 0.8vw, 8px);
-          padding: clamp(2px, 0.5vw, 4px);
+        .hero {
+          padding: 1.5rem 1rem 1.5rem;
         }
-        .benchmark-section {
-          padding: 8px;
-          margin-bottom: 16px;
+        .nav-section {
+          padding: 1rem;
         }
-        .benchmark-header {
-          font-size: 16px;
+        .content {
+          padding: 0 1rem 1.5rem;
         }
-        .device-header {
-          font-size: 12px;
+        .stats-bar {
+          gap: 0.75rem;
         }
-        .table-of-contents {
-          padding: 8px;
-          margin: 8px 0 16px 0;
+        .stat-value {
+          font-size: 1.2rem;
         }
-        .toc-header {
-          font-size: 16px;
-        }
-        .toc-list {
-          gap: 4px;
-        }
-        .toc-item {
-          padding: 3px 6px;
-          font-size: 12px;
-        }
-        .chartCard {
-          max-width: 98vw;
-          height: clamp(240px, 30vh, 320px);
-          padding: 4px;
-        }
-        .chart-title {
-          font-size: 11px;
-          margin-bottom: 2px;
-        }
-        .chart-container {
-          margin-bottom: 8px;
+        .chart-canvas-wrap {
+          height: 220px;
         }
       }
-      .chartCard {
-        width: 100%;
-        max-width: min(95vw, 800px);
-        height: clamp(350px, 45vh, 550px);
-        padding: clamp(6px, 1vw, 12px);
-        margin: 0;
-        border: 1px solid #e0e0e0;
-        border-radius: 6px;
-        background-color: #fafafa;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-        transition: box-shadow 0.2s ease;
-        overflow: hidden;
+
+      /* ── Scrollbar ─────────────────────────────────── */
+      ::-webkit-scrollbar {
+        width: 8px;
       }
-      .chartCard:hover {
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+      ::-webkit-scrollbar-track {
+        background: var(--abyss);
       }
-      .chart-title {
-        font-size: 13px;
-        font-weight: 600;
-        color: #333;
-        margin-bottom: 4px;
-        text-align: center;
-        border-bottom: 1px solid #3273dc;
-        padding-bottom: 2px;
-        width: 100%;
+      ::-webkit-scrollbar-thumb {
+        background: var(--current);
+        border-radius: 4px;
       }
-      .chart-container {
-        margin-bottom: 8px;
-        width: 100%;
+      ::-webkit-scrollbar-thumb:hover {
+        background: var(--surface);
       }
     </style>
-    <title>Oceananigans.jl Benchmarks</title>
   </head>
 
   <body>
-    <header id="header">
-      <div class="header-item">
-        <strong class="header-label">Last Update:</strong>
-        <span id="last-update"></span>
+    <!-- ── Hero ────────────────────────────────────── -->
+    <header class="hero">
+      <div class="wave-container">
+        <svg viewBox="0 0 2400 40" preserveAspectRatio="none">
+          <path
+            d="M0,20 Q150,0 300,20 T600,20 T900,20 T1200,20 T1500,20 T1800,20 T2100,20 T2400,20"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            color="#00e5c8"
+          />
+          <path
+            d="M0,25 Q150,8 300,25 T600,25 T900,25 T1200,25 T1500,25 T1800,25 T2100,25 T2400,25"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1"
+            color="#00e5c8"
+            opacity="0.5"
+          />
+        </svg>
       </div>
-      <div class="header-item">
-        <strong class="header-label">Repository:</strong>
-        <a id="repository-link" rel="noopener"></a>
+      <div class="hero-content fade-up">
+        <h1 class="hero-title">
+          Oceananigans<span>.jl</span>
+        </h1>
+        <p class="hero-subtitle">
+          Performance dashboard tracking GPU benchmark regressions across
+          commits. Measures time-per-timestep and CUDA kernel profiling for
+          ocean simulations running on an NVIDIA TITAN V.
+        </p>
+        <div class="stats-bar" id="stats-bar">
+          <!-- filled by JS -->
+        </div>
       </div>
     </header>
-    <main id="main"></main>
-    <footer>
-      <button id="dl-button">Download data as JSON</button>
-      <div class="spacer"></div>
-      <div class="small">
+
+    <!-- ── Navigation ──────────────────────────────── -->
+    <nav class="nav-section">
+      <div class="nav-label">Benchmark Groups</div>
+      <div class="nav-pills" id="nav-pills">
+        <!-- filled by JS -->
+      </div>
+    </nav>
+
+    <!-- ── Charts ──────────────────────────────────── -->
+    <main class="content" id="main"></main>
+
+    <!-- ── Footer ──────────────────────────────────── -->
+    <footer class="site-footer">
+      <button class="footer-btn" id="dl-button">Download JSON</button>
+      <div class="footer-spacer"></div>
+      <div class="footer-credit">
         Powered by
         <a
-          rel="noopener"
           href="https://github.com/marketplace/actions/continuous-benchmark"
+          rel="noopener"
+          target="_blank"
           >github-action-benchmark</a
+        >
+        ·
+        <a
+          href="https://github.com/CliMA/Oceananigans.jl"
+          rel="noopener"
+          target="_blank"
+          >CliMA/Oceananigans.jl</a
         >
       </div>
     </footer>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.2/dist/Chart.min.js"></script>
+    <!-- ── Scripts ─────────────────────────────────── -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <script src="data.js"></script>
-    <script id="main-script">
+    <script>
       "use strict";
       (function () {
-        const colorPalette = [
-          "#00add8",
-          "#a270ba",
-          "#dea584",
-          "#f1e05a",
-          "#5D6D7E",
-          "#EC7063",
-          "#F4D03F",
-          "#52BE80",
-          "#FF5733",
-          "#33FF57",
-          "#3357FF",
-          "#FF33A1",
-          "#A133FF",
-          "#33FFF6",
-          "#FFC133",
-          "#FF3333",
+        /* ── Palette ──────────────────────────────── */
+        const COLORS = [
+          "#00e5c8",
+          "#ff6b6b",
+          "#ffd93d",
+          "#6bde8a",
+          "#c084fc",
+          "#ff9f43",
+          "#45aaf2",
+          "#fd79a8",
+          "#a29bfe",
+          "#ffeaa7",
+          "#74b9ff",
+          "#fab1a0",
         ];
 
         const MAX_COMMITS = 20;
 
+        /* ── Section descriptions ─────────────────── */
+        const DESCRIPTIONS = {
+          Default:
+            "Baseline configuration — tracks the default simulation setup across commits to detect regressions.",
+          "Resolution Sweep":
+            "Varying grid resolution while keeping all other parameters fixed. Shows how performance scales with problem size.",
+          "Float Type Sweep":
+            "Comparing Float32 vs Float64 arithmetic. Float32 can double throughput on consumer GPUs.",
+          "Closure Sweep":
+            "Testing different turbulence closure models. CATKE is the most expensive; simpler closures are faster.",
+          "Advection Sweep":
+            "Comparing advection schemes (WENO variants, centered). Higher-order WENO schemes cost more per timestep.",
+          "Grid Type Sweep":
+            "Tripolar vs latitude-longitude grids, with and without z-star vertical coordinates.",
+          "Tracer Count Sweep":
+            "Scaling the number of passive tracers. Each additional tracer adds advection and diffusion work.",
+          "NSYS Kernels":
+            "CUDA kernel-level profiling via NVIDIA Nsight Systems. Tracks median GPU time for the hottest kernels.",
+        };
+
+        /* ── Data ingestion ───────────────────────── */
         function init() {
-          function collectBenchesPerTestCase(entries) {
-            const map = new Map();
-            for (const entry of entries) {
-              const { commit, date, tool, benches } = entry;
-              for (const bench of benches) {
-                const result = { commit, date, tool, bench };
-                const splitted_name = bench.name.split("/");
-                // 4-level hierarchy: group / fixed_params / GPU / variant
-                const benchmarkName = splitted_name[0];
-                const passes = splitted_name[1];
-                const device = splitted_name[2];
-                const variant = splitted_name[3];
-
-                if (map.get(benchmarkName) === undefined) {
-                  map.set(benchmarkName, new Map());
-                }
-
-                const mapBenchmarkName = map.get(benchmarkName);
-                if (mapBenchmarkName.get(device) === undefined) {
-                  mapBenchmarkName.set(device, new Map());
-                }
-
-                const mapDevice = mapBenchmarkName.get(device);
-                if (mapDevice.get(passes) === undefined) {
-                  mapDevice.set(passes, new Map());
-                }
-
-                const mapPasses = mapDevice.get(passes);
-                if (mapPasses.get(variant) === undefined) {
-                  mapPasses.set(variant, [result]);
-                } else {
-                  mapPasses.get(variant).push(result);
-                }
-              }
-            }
-            return map;
-          }
-
           const data = window.BENCHMARK_DATA;
 
-          document.getElementById("last-update").textContent = new Date(
-            data.lastUpdate
-          ).toString();
-          const repoLink = document.getElementById("repository-link");
-          repoLink.href = data.repoUrl;
-          repoLink.textContent = data.repoUrl;
+          /* ── Stats ───────────────────────────────── */
+          const entries = data.entries[Object.keys(data.entries)[0]];
+          const totalCommits = entries.length;
+          const totalBenches = entries.reduce(
+            (s, e) => s + e.benches.length,
+            0
+          );
+          const lastDate = new Date(data.lastUpdate);
+          const ago = timeAgo(lastDate);
 
+          const statsBar = document.getElementById("stats-bar");
+          statsBar.innerHTML = `
+            <div class="stat">
+              <span class="stat-value">${totalCommits}</span>
+              <span class="stat-label">Commits tracked</span>
+            </div>
+            <div class="stat">
+              <span class="stat-value">${totalBenches.toLocaleString()}</span>
+              <span class="stat-label">Data points</span>
+            </div>
+            <div class="stat">
+              <span class="stat-value">${ago}</span>
+              <span class="stat-label">Last update</span>
+            </div>
+            <div class="stat">
+              <span class="stat-value"><a href="${data.repoUrl}" target="_blank" rel="noopener" style="color:var(--biolum);text-decoration:none;font-family:var(--font-mono)">CliMA</a></span>
+              <span class="stat-label">Repository</span>
+            </div>
+          `;
+
+          /* ── Download ────────────────────────────── */
           document.getElementById("dl-button").onclick = () => {
-            const dataUrl = "data:," + JSON.stringify(data, null, 2);
+            const blob = new Blob([JSON.stringify(data, null, 2)], {
+              type: "application/json",
+            });
             const a = document.createElement("a");
-            a.href = dataUrl;
+            a.href = URL.createObjectURL(blob);
             a.download = "benchmark_data.json";
             a.click();
+            URL.revokeObjectURL(a.href);
           };
 
-          return Object.keys(data.entries).map((name) => ({
-            name,
-            dataSet: collectBenchesPerTestCase(data.entries[name]),
-          }));
+          /* ── Collect hierarchy ───────────────────── */
+          return collectHierarchy(entries);
         }
 
-        function renderAllChars(dataSets) {
-          // Determine unit and label from the benchmark section name
-          function getUnitInfo(benchmarkName) {
-            if (benchmarkName.startsWith("NSYS Kernels")) {
-              return { yAxisLabel: "ms (total GPU time)", unitLabel: "ms" };
+        function timeAgo(date) {
+          const seconds = Math.floor((Date.now() - date) / 1000);
+          if (seconds < 60) return "just now";
+          const mins = Math.floor(seconds / 60);
+          if (mins < 60) return `${mins}m ago`;
+          const hrs = Math.floor(mins / 60);
+          if (hrs < 24) return `${hrs}h ago`;
+          const days = Math.floor(hrs / 24);
+          return `${days}d ago`;
+        }
+
+        function collectHierarchy(entries) {
+          const map = new Map();
+          for (const entry of entries) {
+            const { commit, date, tool, benches } = entry;
+            for (const bench of benches) {
+              const result = { commit, date, tool, bench };
+              const parts = bench.name.split("/");
+              const group = parts[0];
+              const fixed = parts[1];
+              const device = parts[2];
+              const variant = parts[3];
+
+              if (!map.has(group)) map.set(group, new Map());
+              const gMap = map.get(group);
+              if (!gMap.has(device)) gMap.set(device, new Map());
+              const dMap = gMap.get(device);
+              if (!dMap.has(fixed)) dMap.set(fixed, new Map());
+              const fMap = dMap.get(fixed);
+              if (!fMap.has(variant)) fMap.set(variant, []);
+              fMap.get(variant).push(result);
             }
-            return { yAxisLabel: "s / timestep", unitLabel: "s/timestep" };
+          }
+          return map;
+        }
+
+        /* ── Rendering ────────────────────────────── */
+        function render(dataSet) {
+          const main = document.getElementById("main");
+          const navPills = document.getElementById("nav-pills");
+          const groups = [...dataSet.keys()].sort((a, b) => {
+            // Default first, NSYS last, rest alphabetical
+            if (a === "Default") return -1;
+            if (b === "Default") return 1;
+            if (a.startsWith("NSYS")) return 1;
+            if (b.startsWith("NSYS")) return -1;
+            return a.localeCompare(b);
+          });
+
+          /* ── Nav pills ──────────────────────────── */
+          for (const group of groups) {
+            const deviceMap = dataSet.get(group);
+            let chartCount = 0;
+            for (const dMap of deviceMap.values()) {
+              chartCount += dMap.size;
+            }
+
+            const pill = document.createElement("a");
+            pill.className = "nav-pill";
+            pill.href = `#section-${slug(group)}`;
+            pill.innerHTML = `${group} <span class="pill-count">${chartCount}</span>`;
+            navPills.appendChild(pill);
           }
 
-          function renderGraph(parent, name, graphData, unitInfo) {
-            const canvas = document.createElement("canvas");
-            canvas.style.width = "100%";
-            canvas.style.height = "100%";
-            canvas.style.maxWidth = "100%";
-            canvas.style.maxHeight = "100%";
-            canvas.style.display = "block";
-            parent.appendChild(canvas);
-
-            const setCanvasDimensions = () => {
-              const rect = canvas.getBoundingClientRect();
-              if (rect.width > 0 && rect.height > 0) {
-                canvas.width = rect.width * window.devicePixelRatio;
-                canvas.height = rect.height * window.devicePixelRatio;
-                canvas.style.width = rect.width + "px";
-                canvas.style.height = rect.height + "px";
-                const ctx = canvas.getContext("2d");
-                ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-                return true;
-              }
-              return false;
-            };
-
-            if (!setCanvasDimensions()) {
-              requestAnimationFrame(setCanvasDimensions);
+          /* ── Sections ───────────────────────────── */
+          let sectionDelay = 0.3;
+          for (const group of groups) {
+            const deviceMap = dataSet.get(group);
+            let chartCount = 0;
+            for (const dMap of deviceMap.values()) {
+              chartCount += dMap.size;
             }
 
-            const datasets = [];
-            const allCommits = new Map();
-            for (const variantData of graphData.values()) {
-              for (const result of variantData) {
-                allCommits.set(result.commit.id, {
-                  id: result.commit.id,
-                  date: result.date,
-                  commit: result.commit,
-                });
+            const section = document.createElement("section");
+            section.className = "bench-section";
+            section.id = `section-${slug(group)}`;
+            section.style.animationDelay = `${sectionDelay}s`;
+            sectionDelay += 0.08;
+
+            const descKey = Object.keys(DESCRIPTIONS).find((k) =>
+              group.startsWith(k)
+            );
+
+            section.innerHTML = `
+              <div class="bench-section-header">
+                <h2 class="bench-section-title">${group}</h2>
+                <span class="bench-section-count">${chartCount} chart${chartCount !== 1 ? "s" : ""}</span>
+              </div>
+              ${descKey ? `<p class="bench-section-desc">${DESCRIPTIONS[descKey]}</p>` : ""}
+            `;
+
+            const unitInfo = group.startsWith("NSYS")
+              ? { yLabel: "ms (median GPU time)", unit: "ms" }
+              : { yLabel: "s / timestep", unit: "s/timestep" };
+
+            // Flatten all devices into a single grid (single GPU)
+            const grid = document.createElement("div");
+            grid.className = "chart-grid";
+
+            const devices = [...deviceMap.keys()].sort();
+            for (const device of devices) {
+              const fixedMap = deviceMap.get(device);
+              const fixedKeys = [...fixedMap.keys()].sort();
+              for (const fixed of fixedKeys) {
+                const pair = document.createElement("div");
+                pair.className = "chart-pair";
+
+                const card = document.createElement("div");
+                card.className = "chart-card";
+                card.innerHTML = `<div class="chart-card-title">${fixed}</div>`;
+
+                const wrap = document.createElement("div");
+                wrap.className = "chart-canvas-wrap";
+                card.appendChild(wrap);
+
+                pair.appendChild(card);
+
+                const tableDiv = buildDataTable(fixedMap.get(fixed), unitInfo);
+                pair.appendChild(tableDiv);
+
+                grid.appendChild(pair);
+
+                renderChart(wrap, fixedMap.get(fixed), unitInfo);
               }
             }
-            const sortedCommits = Array.from(allCommits.values())
-              .sort((a, b) => a.date - b.date)
-              .slice(-MAX_COMMITS);
+            section.appendChild(grid);
 
-            const data = {
-              labels: sortedCommits.map((c) => c.id.slice(0, 7)),
-              datasets,
-            };
+            main.appendChild(section);
+          }
 
-            const variantIndices = new Map();
-            const variantNames = [...graphData.keys()].sort();
-            let datasetIndex = 0;
-
-            for (const variantName of variantNames) {
-              const variantData = graphData.get(variantName);
-              const color = colorPalette[datasetIndex % colorPalette.length];
-              const displayLabel = variantName.trim();
-
-              const commitMap = new Map(
-                variantData.map((result) => [result.commit.id, result])
-              );
-              const alignedData = sortedCommits.map((commit) => {
-                const result = commitMap.get(commit.id);
-                if (result) {
-                  return result.bench.value;
+          /* ── Intersection observer for nav highlight ─ */
+          const observer = new IntersectionObserver(
+            (entries) => {
+              for (const entry of entries) {
+                const id = entry.target.id;
+                const pill = navPills.querySelector(`a[href="#${id}"]`);
+                if (pill) {
+                  pill.classList.toggle("active", entry.isIntersecting);
                 }
-                return null;
+              }
+            },
+            { threshold: 0.15 }
+          );
+          document.querySelectorAll(".bench-section").forEach((s) => observer.observe(s));
+        }
+
+        /* ── Chart rendering ──────────────────────── */
+        /* ── Data table beside chart ───────────── */
+        function buildDataTable(variantMap, unitInfo) {
+          const TAIL = 5;
+
+          // Collect and sort all commits across variants
+          const allCommits = new Map();
+          for (const results of variantMap.values()) {
+            for (const r of results) {
+              allCommits.set(r.commit.id, {
+                id: r.commit.id,
+                date: r.date,
+                commit: r.commit,
               });
-
-              const lineData = {
-                label: displayLabel,
-                data: alignedData,
-                borderColor: color,
-                fill: false,
-                lineTension: 0,
-                spanGaps: true,
-              };
-              datasets.push(lineData);
-              variantIndices.set(datasetIndex, variantName);
-              datasetIndex++;
             }
+          }
+          const sorted = [...allCommits.values()]
+            .sort((a, b) => a.date - b.date)
+            .slice(-TAIL);
 
-            const options = {
-              legend: {
-                display: true,
-                position: "bottom",
-                labels: {
-                  boxWidth: 4,
-                  fontSize: 12,
-                  padding: 4,
+          const variantNames = [...variantMap.keys()].sort();
+
+          // Build lookup: variant -> commit id -> value
+          const lookup = new Map();
+          for (const name of variantNames) {
+            const byCommit = new Map();
+            for (const r of variantMap.get(name)) {
+              byCommit.set(r.commit.id, r.bench.value);
+            }
+            lookup.set(name, byCommit);
+          }
+
+          function fmt(v) {
+            if (v == null) return "—";
+            if (v < 0.001) return v.toExponential(2);
+            if (v < 1) return v.toFixed(4);
+            return v.toFixed(3);
+          }
+
+          // Header row
+          let html = "<table><thead><tr><th>commit</th>";
+          for (const name of variantNames) {
+            html += `<th>${cleanKernel(name)}</th>`;
+          }
+          html += "</tr></thead><tbody>";
+
+          // Data rows (most recent at top)
+          for (let i = sorted.length - 1; i >= 0; i--) {
+            const c = sorted[i];
+            const sha = c.id.slice(0, 7);
+            html += `<tr><td>${sha}</td>`;
+            for (const name of variantNames) {
+              const val = lookup.get(name).get(c.id);
+              const prev =
+                i > 0 ? lookup.get(name).get(sorted[i - 1].id) : null;
+
+              let delta = "";
+              if (val != null && prev != null && prev !== 0) {
+                const pct = ((val - prev) / prev) * 100;
+                if (Math.abs(pct) < 0.05) {
+                  delta = ` <span class="delta-zero">±0%</span>`;
+                } else if (pct > 0) {
+                  delta = ` <span class="delta-pos">+${pct.toFixed(1)}%</span>`;
+                } else {
+                  delta = ` <span class="delta-neg">${pct.toFixed(1)}%</span>`;
+                }
+              }
+              html += `<td>${fmt(val)}${delta}</td>`;
+            }
+            html += "</tr>";
+          }
+
+          html += "</tbody></table>";
+
+          const div = document.createElement("div");
+          div.className = "chart-data-table";
+          div.innerHTML = html;
+          return div;
+        }
+
+        function renderChart(container, variantMap, unitInfo) {
+          const canvas = document.createElement("canvas");
+          canvas.style.width = "100%";
+          canvas.style.height = "100%";
+          container.appendChild(canvas);
+
+          // Collect all commits across variants
+          const allCommits = new Map();
+          for (const results of variantMap.values()) {
+            for (const r of results) {
+              allCommits.set(r.commit.id, {
+                id: r.commit.id,
+                date: r.date,
+                commit: r.commit,
+              });
+            }
+          }
+          const sorted = [...allCommits.values()]
+            .sort((a, b) => a.date - b.date)
+            .slice(-MAX_COMMITS);
+
+          const variantNames = [...variantMap.keys()].sort();
+          const datasets = [];
+          const variantIndices = new Map();
+
+          variantNames.forEach((name, i) => {
+            const results = variantMap.get(name);
+            const commitMap = new Map(results.map((r) => [r.commit.id, r]));
+            const color = COLORS[i % COLORS.length];
+
+            datasets.push({
+              label: cleanKernel(name.trim()),
+              data: sorted.map((c) => {
+                const r = commitMap.get(c.id);
+                return r ? r.bench.value : null;
+              }),
+              borderColor: color,
+              backgroundColor: color + "18",
+              pointBackgroundColor: color,
+              pointBorderColor: color,
+              pointRadius: 3,
+              pointHoverRadius: 6,
+              borderWidth: 2,
+              tension: 0,
+              spanGaps: true,
+              fill: datasets.length === 0,
+            });
+            variantIndices.set(i, name);
+          });
+
+          new Chart(canvas, {
+            type: "line",
+            data: {
+              labels: sorted.map((c) => c.id.slice(0, 7)),
+              datasets,
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              interaction: {
+                mode: "index",
+                intersect: false,
+              },
+              plugins: {
+                legend: {
+                  display: true,
+                  position: "bottom",
+                  labels: {
+                    color: "#8fa4d0",
+                    font: {
+                      family: "'Source Sans 3', sans-serif",
+                      size: 11,
+                    },
+                    boxWidth: 10,
+                    boxHeight: 2,
+                    padding: 8,
+                    usePointStyle: false,
+                  },
+                },
+                tooltip: {
+                  backgroundColor: "rgba(10, 14, 23, 0.95)",
+                  titleColor: "#eaf0ff",
+                  bodyColor: "#c4d2ee",
+                  borderColor: "rgba(0, 229, 200, 0.2)",
+                  borderWidth: 1,
+                  titleFont: {
+                    family: "'JetBrains Mono', monospace",
+                    size: 11,
+                  },
+                  bodyFont: {
+                    family: "'Source Sans 3', sans-serif",
+                    size: 12,
+                  },
+                  padding: 10,
+                  cornerRadius: 6,
+                  callbacks: {
+                    afterTitle: function (items) {
+                      if (!items.length) return "";
+                      const idx = items[0].dataIndex;
+                      const commit = sorted[idx].commit;
+                      return (
+                        commit.message.split("\n")[0].slice(0, 72) +
+                        "\n" +
+                        commit.timestamp +
+                        " by @" +
+                        commit.author.username
+                      );
+                    },
+                    label: function (ctx) {
+                      const v = ctx.parsed.y;
+                      if (v === null) return null;
+                      const formatted =
+                        v < 0.001
+                          ? v.toExponential(2)
+                          : v < 1
+                            ? v.toFixed(4)
+                            : v.toFixed(3);
+                      return ` ${ctx.dataset.label}: ${formatted} ${unitInfo.unit}`;
+                    },
+                  },
                 },
               },
               scales: {
-                xAxes: [
-                  {
-                    scaleLabel: {
-                      display: true,
-                      labelString: "commit",
+                x: {
+                  ticks: {
+                    color: "#8fa4d0",
+                    font: {
+                      family: "'JetBrains Mono', monospace",
+                      size: 10,
+                    },
+                    maxRotation: 45,
+                  },
+                  grid: {
+                    color: "rgba(255,255,255,0.04)",
+                  },
+                  title: {
+                    display: true,
+                    text: "commit",
+                    color: "#8fa4d066",
+                    font: {
+                      family: "'Source Sans 3', sans-serif",
+                      size: 11,
                     },
                   },
-                ],
-                yAxes: [
-                  {
-                    scaleLabel: {
-                      display: true,
-                      labelString: unitInfo.yAxisLabel,
+                },
+                y: {
+                  ticks: {
+                    color: "#8fa4d0",
+                    font: {
+                      family: "'JetBrains Mono', monospace",
+                      size: 10,
                     },
-                    ticks: {
-                      maxTicksLimit: 5,
-                      callback: function (value) {
-                        if (value === 0) return "0";
-                        if (value < 0.001) return value.toExponential(2);
-                        if (value < 1) return value.toFixed(4);
-                        return value.toFixed(2);
-                      },
+                    maxTicksLimit: 6,
+                    callback: function (v) {
+                      if (v === 0) return "0";
+                      if (v < 0.001) return v.toExponential(2);
+                      if (v < 1) return v.toFixed(4);
+                      return v.toFixed(2);
                     },
                   },
-                ],
-              },
-              tooltips: {
-                enabled: true,
-                mode: "index",
-                intersect: true,
-                callbacks: {
-                  afterTitle: function (items) {
-                    const item = items[0];
-                    const dataIndex = item.index;
-                    const variantName = variantIndices.get(item.datasetIndex);
-                    const variantData = graphData.get(variantName);
-                    const commitId = sortedCommits[dataIndex].id;
-
-                    const result = variantData.find(
-                      (r) => r.commit.id === commitId
-                    );
-                    if (!result) return "";
-
-                    const commit = result.commit;
-                    return (
-                      "\n" +
-                      commit.message.split("\n")[0] +
-                      "\n\n" +
-                      commit.timestamp +
-                      " committed by @" +
-                      commit.author.username +
-                      "\n"
-                    );
+                  grid: {
+                    color: "rgba(255,255,255,0.04)",
                   },
-                  label: function (item) {
-                    const variantName = variantIndices.get(item.datasetIndex);
-                    return variantName + ": " + item.value + " " + unitInfo.unitLabel;
-                  },
-                  afterLabel: function (item) {
-                    const variantName = variantIndices.get(item.datasetIndex);
-                    const variantData = graphData.get(variantName);
-                    const commitId = sortedCommits[item.index].id;
-
-                    const result = variantData.find(
-                      (r) => r.commit.id === commitId
-                    );
-                    if (!result || !result.bench.extra) return "";
-
-                    return "\n" + result.bench.extra;
+                  title: {
+                    display: true,
+                    text: unitInfo.yLabel,
+                    color: "#8fa4d066",
+                    font: {
+                      family: "'Source Sans 3', sans-serif",
+                      size: 11,
+                    },
                   },
                 },
               },
-              onClick: function (_mouseEvent, activeElems) {
-                if (activeElems.length === 0) return;
-
-                const datasetIndex = activeElems[0]._datasetIndex;
-                const dataIndex = activeElems[0]._index;
-                const variantName = variantIndices.get(datasetIndex);
-                const variantData = graphData.get(variantName);
-                const commitId = sortedCommits[dataIndex].id;
-
-                const result = variantData.find(
-                  (r) => r.commit.id === commitId
-                );
-                if (!result) return;
-
-                window.open(result.commit.url, "_blank");
+              onClick: function (_event, elements) {
+                if (!elements.length) return;
+                const idx = elements[0].index;
+                const commit = sorted[idx].commit;
+                if (commit.url) window.open(commit.url, "_blank");
               },
-            };
-
-            new Chart(canvas, {
-              type: "line",
-              data,
-              options,
-            });
-          }
-
-          function renderDevice(
-            benchmarkName,
-            device,
-            deviceData,
-            parent,
-            unitInfo
-          ) {
-            const deviceSection = document.createElement("div");
-            deviceSection.className = "device-section";
-            parent.appendChild(deviceSection);
-
-            const deviceHeader = document.createElement("h4");
-            deviceHeader.textContent = device.toUpperCase();
-            deviceHeader.className = "device-header";
-            deviceSection.appendChild(deviceHeader);
-
-            const deviceCharts = document.createElement("div");
-            deviceCharts.className = "device-charts";
-            deviceSection.appendChild(deviceCharts);
-
-            const passes = [...deviceData.keys()].sort();
-            for (const pass of passes) {
-              const chartContainer = document.createElement("div");
-              chartContainer.className = "chart-container";
-              deviceCharts.appendChild(chartContainer);
-
-              const titleElem = document.createElement("h6");
-              titleElem.textContent = pass.toUpperCase();
-              titleElem.className = "chart-title";
-              chartContainer.appendChild(titleElem);
-
-              const graphsElem = document.createElement("div");
-              graphsElem.className = "chartCard";
-              chartContainer.appendChild(graphsElem);
-
-              renderGraph(
-                graphsElem,
-                `${benchmarkName} - ${device} - ${pass}`,
-                deviceData.get(pass),
-                unitInfo
-              );
-            }
-          }
-
-          function renderBenchmark(benchmarkName, benchmarkData, parent) {
-            const benchmarkSection = document.createElement("div");
-            benchmarkSection.className = "benchmark-section";
-            benchmarkSection.id = `benchmark-${benchmarkName
-              .toLowerCase()
-              .replace(/[^a-z0-9]/g, "-")}`;
-            parent.appendChild(benchmarkSection);
-
-            const benchmarkHeader = document.createElement("h3");
-            benchmarkHeader.textContent = benchmarkName;
-            benchmarkHeader.className = "benchmark-header";
-            benchmarkSection.appendChild(benchmarkHeader);
-
-            const unitInfo = getUnitInfo(benchmarkName);
-
-            const devices = [...benchmarkData.keys()].sort();
-            for (const device of devices) {
-              renderDevice(
-                benchmarkName,
-                device,
-                benchmarkData.get(device),
-                benchmarkSection,
-                unitInfo
-              );
-            }
-          }
-
-          function createTableOfContents(benchmarkNames, parent) {
-            const tocSection = document.createElement("div");
-            tocSection.className = "table-of-contents";
-
-            const tocHeader = document.createElement("h2");
-            tocHeader.textContent = "Benchmark Groups";
-            tocHeader.className = "toc-header";
-            tocSection.appendChild(tocHeader);
-
-            const tocList = document.createElement("div");
-            tocList.className = "toc-list";
-
-            benchmarkNames.forEach((benchmarkName) => {
-              const tocItem = document.createElement("a");
-              tocItem.href = `#benchmark-${benchmarkName
-                .toLowerCase()
-                .replace(/[^a-z0-9]/g, "-")}`;
-              tocItem.textContent = benchmarkName;
-              tocItem.className = "toc-item";
-              tocList.appendChild(tocItem);
-            });
-
-            tocSection.appendChild(tocList);
-            parent.appendChild(tocSection);
-          }
-
-          const main = document.getElementById("main");
-          const dataSet = dataSets[0].dataSet;
-          const benchmarkNames = [...dataSet.keys()].sort();
-
-          createTableOfContents(benchmarkNames, main);
-
-          const container = document.createElement("div");
-          container.className = "benchmarks-container";
-          main.appendChild(container);
-
-          for (const benchmarkName of benchmarkNames) {
-            renderBenchmark(
-              benchmarkName,
-              dataSet.get(benchmarkName),
-              container
-            );
-          }
+            },
+          });
         }
 
-        renderAllChars(init());
+        function cleanKernel(s) {
+          return s.replace(/^gpu__?/, "");
+        }
+
+        function slug(s) {
+          return s
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/(^-|-$)/g, "");
+        }
+
+        /* ── Go ───────────────────────────────────── */
+        render(init());
       })();
     </script>
   </body>
