@@ -22,9 +22,9 @@
         --slate: #1b2540;
         --current: #243156;
         --surface: #2d3d6b;
-        --foam: #8fa4d0;
-        --light: #c4d2ee;
-        --white: #eaf0ff;
+        --foam: #b0c0e0;
+        --light: #dce4f5;
+        --white: #f5f7ff;
         --biolum: #00e5c8;
         --biolum-dim: #00b89e;
         --coral: #ff6b6b;
@@ -47,7 +47,7 @@
         padding: 0;
       }
       html {
-        font-size: 15px;
+        font-size: 17px;
         scroll-behavior: smooth;
         background: var(--abyss);
       }
@@ -330,11 +330,62 @@
         color: var(--biolum-dim);
       }
       .bench-section-desc {
-        font-size: 0.88rem;
+        font-size: 1rem;
         color: var(--foam);
         margin-bottom: 1.25rem;
-        max-width: 700px;
+        max-width: 900px;
         line-height: 1.5;
+      }
+      .param-row {
+        display: flex;
+        align-items: baseline;
+        gap: 0.4rem;
+        margin-top: 0.6rem;
+      }
+      .param-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        flex: 1;
+      }
+      .param-row-label {
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin-right: 0.2rem;
+        flex-shrink: 0;
+      }
+      .param-row-label.swept {
+        color: var(--biolum);
+      }
+      .param-row-label.fixed {
+        color: var(--foam);
+        opacity: 0.6;
+      }
+      .param-chip {
+        display: inline-flex;
+        align-items: center;
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        padding: 0.15rem 0.5rem;
+        border-radius: 4px;
+        line-height: 1.4;
+      }
+      .param-chip .param-key {
+        opacity: 0.5;
+        margin-right: 0.2rem;
+      }
+      .param-chip.swept {
+        color: var(--biolum);
+        background: rgba(0, 229, 200, 0.1);
+        border: 1px solid rgba(0, 229, 200, 0.25);
+      }
+      .param-chip.fixed {
+        color: var(--foam);
+        background: rgba(143, 164, 208, 0.08);
+        border: 1px solid rgba(143, 164, 208, 0.15);
       }
 
       /* ── Device block ──────────────────────────────── */
@@ -418,6 +469,9 @@
         width: 100%;
         height: 320px;
         position: relative;
+      }
+      .chart-canvas-wrap.nsys {
+        height: 480px;
       }
 
       /* ── Chart + table pair ────────────────────────── */
@@ -734,18 +788,42 @@
         const DESCRIPTIONS = {
           Default:
             "Baseline configuration — tracks the default simulation setup across commits to detect regressions.",
-          "Resolution Sweep":
-            "Varying grid resolution while keeping all other parameters fixed. Shows how performance scales with problem size.",
-          "Float Type Sweep":
-            "Comparing Float32 vs Float64 arithmetic. Float32 can double throughput on consumer GPUs.",
-          "Closure Sweep":
-            "Testing different turbulence closure models. Complicated closures are expensive, simpler closures are faster.",
-          "Advection Sweep":
-            "Comparing advection schemes (WENO variants, centered). Higher-order WENO schemes cost more per timestep.",
-          "Grid Type Sweep":
-            "Tripolar vs latitude-longitude grids, with and without z-star vertical coordinates.",
-          "Tracer Count Sweep":
-            "Scaling the number of passive tracers. Each additional tracer adds advection and diffusion work.",
+          "Resolution Sweep": {
+            text: "Varying grid resolution from 180×90×50 to 720×360×50. Shows how performance scales with problem size.",
+            swept: "size",
+            fixed: { grid_type: "tripolar", float_type: "Float64", momentum_advection: "WENOVectorInvariantDefault", tracer_advection: "WENO7", closure: "CATKE" },
+          },
+          "Float Type Sweep": {
+            text: "Comparing Float32 vs Float64 arithmetic. Float32 can double throughput on consumer GPUs.",
+            swept: "float_type",
+            fixed: { grid_type: "tripolar", size: "360×180×50", momentum_advection: "WENOVectorInvariantDefault", tracer_advection: "WENO7", closure: "CATKE" },
+          },
+          "Closure Sweep": {
+            text: "Testing different turbulence closure models — complicated closures are expensive, simpler closures are faster.",
+            swept: "closure",
+            fixed: { grid_type: "tripolar", size: "360×180×50", float_type: "Float64", momentum_advection: "WENOVectorInvariantDefault", tracer_advection: "WENO7" },
+          },
+          "Advection Sweep": {
+            text: "Comparing advection schemes from nothing to WENO 9th order. Higher-order schemes cost more per timestep.",
+            swept: "momentum_advection, tracer_advection",
+            fixed: { grid_type: "tripolar", size: "360×180×50", float_type: "Float64", closure: "CATKE" },
+          },
+          "Grid Type Sweep": {
+            text: "Tripolar vs latitude-longitude grids, with and without z-star coordinates and immersed boundaries.",
+            swept: "grid_type, zstar_coordinate",
+            fixed: { size: "360×180×50", float_type: "Float64", momentum_advection: "WENOVectorInvariantDefault", tracer_advection: "WENO7", closure: "CATKE" },
+          },
+          "Tracer Count Sweep": {
+            text: "Scaling the number of passive tracers from 2 to 5. Each additional tracer adds advection and diffusion work.",
+            swept: "tracers",
+            fixed: { grid_type: "tripolar", size: "360×180×50", float_type: "Float64", closure: "CATKE" },
+          },
+          "NSYS Kernels": {
+            text: "CUDA kernel-level profiling via NVIDIA Nsight Systems. Tracks median GPU time for the hottest kernels.",
+          },
+          Default: {
+            text: "Baseline configuration — tracks the default simulation setup across commits to detect regressions.",
+          },
           "NSYS Kernels":
             "CUDA kernel-level profiling via NVIDIA Nsight Systems. Tracks median GPU time for the hottest kernels.",
         };
@@ -882,13 +960,36 @@
             const descKey = Object.keys(DESCRIPTIONS).find((k) =>
               group.startsWith(k)
             );
+            const desc = descKey ? DESCRIPTIONS[descKey] : null;
+
+            let descHTML = "";
+            if (desc) {
+              const text = typeof desc === "string" ? desc : desc.text;
+              descHTML = `<div class="bench-section-desc">${text}`;
+
+              if (desc.swept) {
+                descHTML += `<div class="param-row"><span class="param-row-label swept">Swept:</span><div class="param-chips">`;
+                for (const s of desc.swept.split(", ")) {
+                  descHTML += `<span class="param-chip swept">${s}</span>`;
+                }
+                descHTML += `</div></div>`;
+              }
+              if (desc.fixed) {
+                descHTML += `<div class="param-row"><span class="param-row-label fixed">Fixed:</span><div class="param-chips">`;
+                for (const [k, v] of Object.entries(desc.fixed)) {
+                  descHTML += `<span class="param-chip fixed"><span class="param-key">${k}=</span>${v}</span>`;
+                }
+                descHTML += `</div></div>`;
+              }
+              descHTML += `</div>`;
+            }
 
             section.innerHTML = `
               <div class="bench-section-header">
                 <h2 class="bench-section-title">${group}</h2>
                 <span class="bench-section-count">${chartCount} chart${chartCount !== 1 ? "s" : ""}</span>
               </div>
-              ${descKey ? `<p class="bench-section-desc">${DESCRIPTIONS[descKey]}</p>` : ""}
+              ${descHTML}
             `;
 
             const unitInfo = group.startsWith("NSYS")
@@ -911,8 +1012,9 @@
                 card.className = "chart-card";
                 card.innerHTML = `<div class="chart-card-title">${fixed}</div>`;
 
+                const isNSYS = group.startsWith("NSYS");
                 const wrap = document.createElement("div");
-                wrap.className = "chart-canvas-wrap";
+                wrap.className = "chart-canvas-wrap" + (isNSYS ? " nsys" : "");
                 card.appendChild(wrap);
 
                 pair.appendChild(card);
@@ -1097,30 +1199,30 @@
                   display: true,
                   position: "bottom",
                   labels: {
-                    color: "#8fa4d0",
+                    color: "#b0c0e0",
                     font: {
                       family: "'Source Sans 3', sans-serif",
-                      size: 11,
+                      size: 12,
                     },
                     boxWidth: 10,
                     boxHeight: 2,
-                    padding: 8,
+                    padding: 6,
                     usePointStyle: false,
                   },
                 },
                 tooltip: {
                   backgroundColor: "rgba(10, 14, 23, 0.95)",
-                  titleColor: "#eaf0ff",
-                  bodyColor: "#c4d2ee",
+                  titleColor: "#f5f7ff",
+                  bodyColor: "#dce4f5",
                   borderColor: "rgba(0, 229, 200, 0.2)",
                   borderWidth: 1,
                   titleFont: {
                     family: "'JetBrains Mono', monospace",
-                    size: 11,
+                    size: 13,
                   },
                   bodyFont: {
                     family: "'Source Sans 3', sans-serif",
-                    size: 12,
+                    size: 14,
                   },
                   padding: 10,
                   cornerRadius: 6,
@@ -1154,10 +1256,10 @@
               scales: {
                 x: {
                   ticks: {
-                    color: "#8fa4d0",
+                    color: "#b0c0e0",
                     font: {
                       family: "'JetBrains Mono', monospace",
-                      size: 10,
+                      size: 12,
                     },
                     maxRotation: 45,
                   },
@@ -1167,19 +1269,19 @@
                   title: {
                     display: true,
                     text: "commit",
-                    color: "#8fa4d066",
+                    color: "#b0c0e088",
                     font: {
                       family: "'Source Sans 3', sans-serif",
-                      size: 11,
+                      size: 12,
                     },
                   },
                 },
                 y: {
                   ticks: {
-                    color: "#8fa4d0",
+                    color: "#b0c0e0",
                     font: {
                       family: "'JetBrains Mono', monospace",
-                      size: 10,
+                      size: 12,
                     },
                     maxTicksLimit: 6,
                     callback: function (v) {
@@ -1195,10 +1297,10 @@
                   title: {
                     display: true,
                     text: unitInfo.yLabel,
-                    color: "#8fa4d066",
+                    color: "#b0c0e088",
                     font: {
                       family: "'Source Sans 3', sans-serif",
-                      size: 11,
+                      size: 12,
                     },
                   },
                 },
@@ -1215,6 +1317,10 @@
 
         function cleanKernel(s) {
           return s.replace(/^gpu__?/, "");
+        }
+
+        function truncate(s, max) {
+          return s.length > max ? s.slice(0, max - 1) + "…" : s;
         }
 
         function slug(s) {
