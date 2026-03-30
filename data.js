@@ -1041,19 +1041,19 @@ window.BENCHMARK_DATA = {
       {
         "commit": {
           "author": {
-            "name": "dependabot[bot]",
-            "username": "dependabot[bot]",
-            "email": "49699333+dependabot[bot]@users.noreply.github.com"
+            "name": "Simone Silvestri",
+            "username": "simone-silvestri",
+            "email": "silvestri.simone0@gmail.com"
           },
           "committer": {
             "name": "GitHub",
             "username": "web-flow",
             "email": "noreply@github.com"
           },
-          "id": "16482f541dab40f16245a430c42df0df6b0ced85",
-          "message": "Bump codecov/codecov-action from 5 to 6 (#5455)\n\nBumps [codecov/codecov-action](https://github.com/codecov/codecov-action) from 5 to 6.\n- [Release notes](https://github.com/codecov/codecov-action/releases)\n- [Changelog](https://github.com/codecov/codecov-action/blob/main/CHANGELOG.md)\n- [Commits](https://github.com/codecov/codecov-action/compare/v5...v6)\n\n---\nupdated-dependencies:\n- dependency-name: codecov/codecov-action\n  dependency-version: '6'\n  dependency-type: direct:production\n  update-type: version-update:semver-major\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>\nCo-authored-by: Simone Silvestri <silvestri.simone0@gmail.com>",
-          "timestamp": "2026-03-30T07:41:41Z",
-          "url": "https://github.com/CliMA/Oceananigans.jl/commit/16482f541dab40f16245a430c42df0df6b0ced85"
+          "id": "b91775407a52bc73a8e9ac93f07b785cdc336fd3",
+          "message": "Fix publish-benchmarks pipeline token permissions (#5448)",
+          "timestamp": "2026-03-30T07:40:09Z",
+          "url": "https://github.com/CliMA/Oceananigans.jl/commit/b91775407a52bc73a8e9ac93f07b785cdc336fd3"
         },
         "date": 1774862055768,
         "tool": "customSmallerIsBetter",
