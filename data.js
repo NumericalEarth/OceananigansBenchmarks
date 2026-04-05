@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775147871148,
+  "lastUpdate": 1775386588075,
   "repoUrl": "https://github.com/CliMA/Oceananigans.jl",
   "entries": {
     "Oceananigans.jl Benchmarks": [
@@ -3764,6 +3764,188 @@ window.BENCHMARK_DATA = {
           {
             "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
             "value": 0.08212400663000001,
+            "unit": "s/timestep"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Lois Baker",
+            "username": "loisbaker",
+            "email": "lbaker@ed.ac.uk"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "ddce08b1d82c324492c38b0474d41d204c61b90d",
+          "message": "Pass grid to poisson_eigenvalues and set eigenvalues to be `eltype(grid)` (#5373)\n\n* Pass grid to poisson_eigenvalues, define with Float32 for Metal and add test\n\n* Remove trailing whitespace\n\n* Explicitly return Float64 Poisson eigenvalues\n\n* Return Poisson eigenvalues with eltype(grid) on Metal\n\n* Rename `JULIA_DEPOT_PATH` to the `.julia` for buildkite (#5368)\n\n* (0.105.4) Add basic tests for Reactant-Oceananigans correctness (#5093)\n\n* Add basic reactant correctness tests\n\n* comment out other tests\n\n* add more grids\n\n* implement take Gu tendency\n\n* test with different raise options\n\n* test raise=true and raise=false\n\n* raise=true\n\n* add fake halo filling kernels\n\n* filter triply periodic tests\n\n* add reactant to weakdeps\n\n* add more tests\n\n* updates\n\n* clean up\n\n* update report\n\n* fix\n\n* fix\n\n* update report\n\n* Update test_reactant_correctness.jl\n\n* Refactor new_data function to remove ReactantState\n\n* Change total_size function parameter type to ShardedGrid\n\n* try to restrict offset_array for sharding a bit more\n\n* test raise_first too\n\n* fix imports\n\n* Comment out failing Reactant correctness tests and remove raise=true mode\n\nDisable raise=true mode across all tests due to non-deterministic segfaults\nin Reactant's CanonicalizeLoopsPass (MLIR bug). Comment out TripolarGrid\nhalo tests (Zipper BC compilation crashes) and HydrostaticFreeSurfaceModel\ntime-stepping tests (MLIR codegen error: incorrect operand count). The\nremaining 102 tests (halo filling + Gu tendencies) pass reliably.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\n\n* Fix CI to actually run Reactant correctness tests\n\nTEST_GROUP was set to \"reactant\" which matches no group in runtests.jl,\nso CI was running 0 Reactant tests and reporting success.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\n\n* Attempt fix\n\n* Fix fix\n\n* Whitespace\n\n* Apply suggestion from @glwagner\n\n* Apply suggestion from @glwagner\n\n* Delete test/fake_halo_fill_kernels.jl\n\n* Delete test/test_fake_halo_fill.jl\n\n* Delete reactant_raise_true_report.md\n\n* Apply suggestion from @glwagner\n\n* Apply suggestion from @glwagner\n\n* Apply suggestion from @glwagner\n\n* Update runtests.jl\n\n* Apply suggestion from @glwagner\n\n* Apply suggestion from @glwagner\n\n* Update test_reactant_correctness.jl\n\n* Apply suggestion from @glwagner\n\n* Use halo=(3,3,3) in Reactant correctness tests and skip initialization_update_state\\! for Reactant models\n\n- Increase halo size from (1,1,1) to (3,3,3) in fill_halo_regions\\! tests\n- Re-enable Bounded LLG topology test\n- Add no-op initialization_update_state\\! for ReactantHFSM to defer\n  kernel execution to first_time_step\\! (runs inside @compile context)\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\n\n* Revert fill_halo tests to halo=(1,1,1) to avoid MLIR pass bug on Linux x64\n\nhalo=(3,3,3) with periodic boundaries triggers a Reactant MLIR\noptimization pass failure on Linux x64. Keep halo=(1,1,1) for\nfill_halo tests (which pass) while compute_simple_Gu\\! retains\nhalo=(3,3,3) as required by WENO.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\n\n* Add MWE for Reactant MLIR pass failure on periodic halo kernels\n\nStandalone reproducer (no Oceananigans dependency) for the MLIR\noptimization pass bug on Linux x64 with halo size H=3.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\n\n* Simplify MWE to single kernel\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\n\n* Update MWE to reproduce ka_with_reactant error without CUDA\n\nRemove `using CUDA` so the MWE reproduces the same MethodError\nas Oceananigans: ka_with_reactant has no method without ReactantCUDAExt.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\n\n* Comment out RectilinearGrid Gu tests with Periodic topologies\n\nReactant's MLIR raise pass fails on periodic halo-filling kernels with\nhalo >= 2 (\"cannot raise if yet\" error). Add standalone MWE reproducer.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\n\n* Delete test/reactant_raise_periodic_halo_mwe.jl\n\n* Update MWE to reproduce compute_simple_Gu\\! CI test failure\n\nMinimal script using Oceananigans that reproduces the fill_halo_regions\\!\nraise=true failure on periodic topologies with halo=(3,3,3).\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\n\n* Fix MWE imports and usage instructions\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\n\n* Use view instead of indexing in cpu_face_constructor_r (#5376)\n\n* Use view instead of indexing in cpu_face_constructor_r\n\nAvoids scalar indexing errors when grid data is stored on\nnon-CPU architectures (e.g. Reactant ConcreteIFRTArray).\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\n\n* Add on_architecture(::CPU, ::OffsetArray{..., <:AnyConcreteReactantArray})\n\nThe generic fallback on_architecture(arch, a) = a doesn't convert\nOffsetArrays wrapping Reactant arrays. This adds a proper method\nthat converts the underlying Reactant array to Array while preserving\nthe OffsetArray wrapper.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>\n\n* Delete test/reactant_raise_periodic_halo_mwe.jl\n\n* Add maybe_initialize_state\\! no-op for Reactant models\n\nThe iteration == 0 check in maybe_initialize_state\\! evaluates at trace\ntime (ConcreteRNumber(0) == 0 is true), causing a redundant update_state\\!\nto be compiled into every time_step\\!. Make it a no-op for Reactant models\nsince first_time_step\\! handles initialization explicitly.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\n\n* Apply suggestion from @glwagner\n\n* Replace bcs... splatting with explicit indexing in fill_halo_event\\!\n\nExtends the fix from 0807efecf to polar_boundary_condition.jl and\nfill_halo_regions_open.jl. Reactant cannot reconcile different call\narity from splatting variable-length tuples into the same kernel.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\n\n* Pass clock and fields to only_local_halos fill_halo_regions\\! calls\n\nAvoids empty args tuple in fill_halo_event\\!, which causes Reactant\nMLIR compilation failures (empty tuples get eliminated at call sites\nbut not in function definitions, causing operand count mismatch).\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\n\n* Add nothing to tendency kernels for Reactant compatibility\n\nKA kernels with implicit Float64 return values (from array assignment\nas last expression) cause Reactant to generate a Returns{Float64}\nparameter in the LLVM function definition that doesn't match the call\nsite. Adding `nothing` as the last expression prevents this.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\n\n* Add kernel_clock workaround for Reactant MLIR/LLVM lowering bug\n\nReactant/Enzyme generates a phantom pointer parameter when mutable structs\ncontaining ConcreteIFRTNumber scalar fields are placed in tuples passed to\nKA kernels. This causes 'llvm.call incorrect number of operands' errors.\n\nThe workaround converts Clock to a NamedTuple (via kernel_clock) before\nplacing it in kernel argument tuples. The NamedTuple has identical field\naccess semantics and doesn't trigger the LLVM bug.\n\n- kernel_clock(clock) defaults to identity (no-op on CPU/GPU)\n- Reactant extension overrides to return NamedTuple\n- Applied to all HFSM call sites: tendency kernels, fill_halo_regions\\!,\n  implicit_step\\!, flux BCs, split-explicit substepping\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\n\n* revert\n\n* Apply suggestion from @glwagner\n\n* Apply suggestion from @glwagner\n\n* Apply suggestion from @glwagner\n\n* Apply suggestion from @glwagner\n\n* Apply suggestion from @glwagner\n\n* Apply suggestion from @glwagner\n\n* Test more things\n\n* is it about the halo size?\n\n* run Reactant tests on 1.11.9\n\n* put halo back to 3\n\n* simplify SubArray convertion to arch\n\n* emit something silly for prettytime of tracednumber\n\n* try to run reactant tests with checkbounds=auto\n\n* fix dispatch\n\n* resolve multi region ambiguity\n\n* Apply suggestion from @glwagner\n\n* multiregion fill halo fix\n\n---------\n\nCo-authored-by: William Moses <gh@wsmoses.com>\nCo-authored-by: dkytezab <danielkytezable@gmail.com>\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>\n\n* Bump julia-actions/cache from 2 to 3 (#5382)\n\nBumps [julia-actions/cache](https://github.com/julia-actions/cache) from 2 to 3.\n- [Release notes](https://github.com/julia-actions/cache/releases)\n- [Commits](https://github.com/julia-actions/cache/compare/v2...v3)\n\n---\nupdated-dependencies:\n- dependency-name: julia-actions/cache\n  dependency-version: '3'\n  dependency-type: direct:production\n  update-type: version-update:semver-major\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>\n\n* Remove poisson_eigenvalues from OceananigansMetalExt\n\n* Set Poisson eigenvalues to eltype(grid)\n\n* Add tests for poisson_eigenvalues float type\n\n* Update docstrings for poisson_eigenvalues\n\n* Remove trailing whitespace\n\n* Fix missing newline at end of test_metal.jl\n\n---------\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: Tomás Chor <tomaschor@gmail.com>\nCo-authored-by: Gregory L. Wagner <wagner.greg@gmail.com>\nCo-authored-by: William Moses <gh@wsmoses.com>\nCo-authored-by: dkytezab <danielkytezable@gmail.com>\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>\nCo-authored-by: Navid C. Constantinou <navidcy@users.noreply.github.com>\nCo-authored-by: Gregory L. Wagner <gregory.leclaire.wagner@gmail.com>",
+          "timestamp": "2026-04-03T04:23:19Z",
+          "url": "https://github.com/CliMA/Oceananigans.jl/commit/ddce08b1d82c324492c38b0474d41d204c61b90d"
+        },
+        "date": 1775386587580,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Default/tripolar 360x180x50 F64/NVIDIA TITAN V/default",
+            "value": 0.08242861583,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gu_",
+            "value": 3.953992,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gv_",
+            "value": 3.7892565,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 2.563696,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 2.535248,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 2.526672,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__rk_substep_turbulent_kinetic_energy_",
+            "value": 1.987828,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_CATKE_closure_fields_",
+            "value": 1.584438,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_w_from_continuity_",
+            "value": 0.339997,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_TKE_diffusivity_",
+            "value": 0.64262,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_solve_batched_tridiagonal_system_kernel_",
+            "value": 0.526365,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/180x90x50",
+            "value": 0.02992426919,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/720x360x50",
+            "value": 0.32214802279,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F32",
+            "value": 0.055182621779999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/nothing",
+            "value": 0.04929122105,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+Biharmonic",
+            "value": 0.11015577646000001,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+GM+Biharmonic",
+            "value": 0.29177035101000004,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/nothing+nothing",
+            "value": 0.04001750408,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant5+WENO5",
+            "value": 0.06798998243,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant9+WENO9",
+            "value": 0.12074479551,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon_zstar",
+            "value": 0.10066782755,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon_zstar",
+            "value": 0.08931467895,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar_zstar",
+            "value": 0.08722913854,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon",
+            "value": 0.0865754811,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon",
+            "value": 0.08129923477,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/3 tracers",
+            "value": 0.09155559335999999,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/360x180x50",
+            "value": 0.08242861583,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F64",
+            "value": 0.08242861583,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE",
+            "value": 0.08242861583,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariantDefault+WENO7",
+            "value": 0.08242861583,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar",
+            "value": 0.08242861583,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
+            "value": 0.08242861583,
             "unit": "s/timestep"
           }
         ]
