@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775570731215,
+  "lastUpdate": 1775593143727,
   "repoUrl": "https://github.com/CliMA/Oceananigans.jl",
   "entries": {
     "Oceananigans.jl Benchmarks": [
@@ -4492,6 +4492,188 @@ window.BENCHMARK_DATA = {
           {
             "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
             "value": 0.08210426612999999,
+            "unit": "s/timestep"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Simone Silvestri",
+            "username": "simone-silvestri",
+            "email": "silvestri.simone0@gmail.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "aa537c799ce2904038a14ef5bc900853126fd7be",
+          "message": "Move velocity halo filling into `rk3_substep!` and `ab2_step!` for `HydrostaticFreeSurfaceModel` (#5352)\n\n* this should work\n\n* this should be correct\n\n* Import surface and volume kernel parameters\n\n* correct the implicit solver\n\n* will this work?\n\n* this should work now\n\n* just a test still stuff to fix\n\n* masking was the issue\n\n* new changes\n\n* some more bugfixes\n\n* we need transport velocities for all free surfaces\n\n* no-op for a nothing free surface\n\n* do not need to reupdate vertical velocities anymore\n\n* Potential fix for pull request finding\n\nCo-authored-by: Copilot Autofix powered by AI <175728472+Copilot@users.noreply.github.com>\n\n* Potential fix for pull request finding\n\nCo-authored-by: Copilot Autofix powered by AI <175728472+Copilot@users.noreply.github.com>\n\n* cover ZeroField appropriately\n\n* import Face and Center\n\n* Fix XLA buffer donation error from aliased clock fields in tick!\n\nIn tick!, both clock.last_Δt and clock.last_stage_Δt were set to the\nsame Δt.mlir_data, causing them to alias. Inside @trace for loops,\nthis triggers \"Attempt to donate a buffer which is also used by the\nsame call to Execute()\" because XLA tries to donate one while reading\nthe other in the while loop carry. Break the alias by creating a copy\nvia Δt + zero(Δt) for last_stage_Δt.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* Remove initialization_update_state! and clean up initialization\n\nReplace the confusing `initialization_update_state!` with a clear separation\nof concerns between `reconcile_state!`, `initialize!`, and `update_state!`:\n\n- `reconcile_state!`: ensures auxiliary state (barotropic velocities, vertical\n  coordinate scaling) is consistent with prognostic fields. Called in `set!`\n  and `initialize!`. Idempotent.\n\n- `initialize!`: one-time setup before first time step. Calls `reconcile_state!`,\n  synchronous halo fills, and `initialize_closure_fields!`. Allowed to be\n  non-idempotent.\n\n- `update_state!`: idempotent recomputation of diagnostics/derived quantities.\n  Called every time step and after `set!`.\n\nRenames:\n- `initialize_free_surface!` → `reconcile_free_surface!`\n- `initialize_vertical_coordinate!` → `reconcile_vertical_coordinate!`\n- `maybe_initialize_state!` → `maybe_initialize!` (now also calls `initialize!`)\n\nThe `set!` function gains a `reconcile_state` kwarg (default `true`) for\nadvanced users who set barotropic velocities independently.\n\nBump version to 0.106.1.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* Remove initialize! call from maybe_initialize!\n\nmaybe_initialize! should only call update_state!, not initialize!.\nCalling initialize! inside time_step! would cause double-initialization\nwhen used with Simulation (which already calls initialize! in\nSimulation.initialize!).\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* Rename maybe_initialize! to maybe_prepare_first_time_step!\n\nAlso move reconcile_state! definition to TimeSteppers (where update_state!\nlives) and call it from maybe_prepare_first_time_step! so that bare\ntime_step!(model, Δt) reconciles state on the first step.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* Use optimization_barrier instead of +zero to break clock field alias\n\nXLA folds Δt + zero(Δt) → Δt, so the aliasing between last_Δt and\nlast_stage_Δt persists. Use Reactant.Ops.optimization_barrier which\nXLA cannot fold, ensuring distinct buffers for the while loop carry.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* Add materialize_clock! and remove optimization_barrier from tick!\n\nAdd `materialize_clock!(clock, timestepper)` called in HFSM and NH model\nconstructors. For QuasiAdamsBashforth2TimeStepper, this sets\n`clock.last_Δt = clock.last_stage_Δt` to ensure they are distinct objects.\nThis is needed for Reactant, where aliased ConcreteRNumber fields cause\nXLA buffer donation errors in compiled loops.\n\nWith materialize_clock! breaking the alias at construction time, the\noptimization_barrier workaround in the Reactant tick! override is no\nlonger needed and is removed.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* Restore optimization_barrier in Reactant tick!\n\nmaterialize_clock! in the constructor doesn't prevent MLIR-level aliasing\nthat occurs at runtime inside tick! when both last_Δt and last_stage_Δt\nare assigned the same Δt value. The optimization_barrier is still needed\nuntil Reactant provides a proper buffer copy op.\n\nSee https://github.com/CliMA/Oceananigans.jl/pull/5389#discussion_r2969696801\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* Remove optimization_barrier from Reactant tick!\n\nmaterialize_clock! in the model constructor ensures last_Δt and\nlast_stage_Δt are distinct ConcreteRNumber objects. Assigning the same\nvalue to both in tick! via .mlir_data does not re-alias the objects.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* Move materialize_clock! QAB2 method to Reactant extension\n\nFor QAB2, last_Δt and last_stage_Δt always hold the same value after\ntick!. In the Reactant extension, materialize_clock! aliases them via\nsetfield! (bypassing the ReactantClock setproperty! override) so that\nReactant's tracer sees one buffer, avoiding XLA buffer donation errors.\n\nThe src/ QAB2 method is removed since aliasing is only needed for\nReactant's ConcreteRNumber fields (normal Float64 fields are immutable\nvalues with no aliasing concern).\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* import Field\n\n* rm stale import\n\n* fill free surface halos before timestepping\n\n* remove stale imports\n\n* add fill halos in reconcile_state!\n\n* now just need to fix multi-region\n\n* cubed sphere implementation\n\n* fix the dispatch\n\n* barotropic correction for implicit free surface\n\n* add an MC Repl command\n\n* fix all tests\n\n* remove whitespace\n\n* mask velocities before filling\n\n* remove stale imports\n\n* fix multi-region behavior\n\n* remove whitespace\n\n* correct GPU tests\n\n* fix all tests\n\n* fix whitespace\n\n* this is better\n\n* remove vestigial file\n\n* update now\n\n* mask velocities where needed\n\n* remove whitespace\n\n* we can use CATKE without synchronization!\n\n* remove stub\n\n* better comment\n\n---------\n\nCo-authored-by: Copilot Autofix powered by AI <175728472+Copilot@users.noreply.github.com>\nCo-authored-by: Gregory Wagner <gregory.leclaire.wagner@gmail.com>\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\nCo-authored-by: Gregory L. Wagner <wagner.greg@gmail.com>",
+          "timestamp": "2026-04-07T13:40:16Z",
+          "url": "https://github.com/CliMA/Oceananigans.jl/commit/aa537c799ce2904038a14ef5bc900853126fd7be"
+        },
+        "date": 1775593143232,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Default/tripolar 360x180x50 F64/NVIDIA TITAN V/default",
+            "value": 0.08268961201,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gu_",
+            "value": 3.947931,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gv_",
+            "value": 3.780124,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 2.560018,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 2.52981,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 2.522962,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__rk_substep_turbulent_kinetic_energy_",
+            "value": 1.988854,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_CATKE_closure_fields_",
+            "value": 1.58172,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_w_from_continuity_",
+            "value": 0.338527,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_TKE_diffusivity_",
+            "value": 0.642589,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_solve_batched_tridiagonal_system_kernel_",
+            "value": 0.527165,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/180x90x50",
+            "value": 0.030749717479999997,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/720x360x50",
+            "value": 0.32415956606,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F32",
+            "value": 0.05718119025,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/nothing",
+            "value": 0.049844522509999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+Biharmonic",
+            "value": 0.11077002285000001,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+GM+Biharmonic",
+            "value": 0.29259763837,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/nothing+nothing",
+            "value": 0.0406695919,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant5+WENO5",
+            "value": 0.06888501264,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant9+WENO9",
+            "value": 0.12130735056000001,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon_zstar",
+            "value": 0.10291113126000001,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon_zstar",
+            "value": 0.09019450055,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar_zstar",
+            "value": 0.08797135241,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon",
+            "value": 0.08703960728,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon",
+            "value": 0.08174753504,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/3 tracers",
+            "value": 0.09211019187,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/360x180x50",
+            "value": 0.08268961201,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F64",
+            "value": 0.08268961201,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE",
+            "value": 0.08268961201,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariantDefault+WENO7",
+            "value": 0.08268961201,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar",
+            "value": 0.08268961201,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
+            "value": 0.08268961201,
             "unit": "s/timestep"
           }
         ]
