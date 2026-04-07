@@ -298,6 +298,192 @@
         opacity: 0.6;
       }
 
+      /* ── History window slider ─────────────────────── */
+      .history-row {
+        display: flex;
+        align-items: center;
+        gap: 1.1rem;
+        margin-top: 1.1rem;
+        padding-top: 1.1rem;
+        border-top: 1px solid var(--current);
+      }
+      .history-label {
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        font-weight: 500;
+        color: var(--foam);
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        white-space: nowrap;
+      }
+      .history-slider-wrap {
+        flex: 1 1 auto;
+        min-width: 120px;
+        max-width: 480px;
+        position: relative;
+        display: flex;
+        align-items: center;
+        height: 22px;
+      }
+      .history-slider {
+        --pct: 100%;
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100%;
+        height: 22px;
+        background: transparent;
+        cursor: grab;
+        margin: 0;
+        padding: 0;
+      }
+      .history-slider:active {
+        cursor: grabbing;
+      }
+      /* WebKit track */
+      .history-slider::-webkit-slider-runnable-track {
+        height: 2px;
+        border-radius: 1px;
+        background: linear-gradient(
+          to right,
+          var(--biolum) 0%,
+          var(--biolum) var(--pct),
+          var(--current) var(--pct),
+          var(--current) 100%
+        );
+      }
+      /* WebKit thumb */
+      .history-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--biolum);
+        border: 1px solid var(--abyss);
+        margin-top: -6px;
+        box-shadow: 0 0 12px rgba(0, 229, 200, 0.4);
+        transition: width 0.18s ease, height 0.18s ease,
+          margin-top 0.18s ease, box-shadow 0.18s ease;
+      }
+      .history-slider:hover::-webkit-slider-thumb,
+      .history-slider:active::-webkit-slider-thumb {
+        width: 16px;
+        height: 16px;
+        margin-top: -7px;
+        box-shadow: 0 0 18px rgba(0, 229, 200, 0.55);
+      }
+      /* Firefox track */
+      .history-slider::-moz-range-track {
+        height: 2px;
+        border-radius: 1px;
+        background: var(--current);
+      }
+      .history-slider::-moz-range-progress {
+        height: 2px;
+        border-radius: 1px;
+        background: var(--biolum);
+      }
+      /* Firefox thumb */
+      .history-slider::-moz-range-thumb {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--biolum);
+        border: 1px solid var(--abyss);
+        box-shadow: 0 0 12px rgba(0, 229, 200, 0.4);
+        transition: width 0.18s ease, height 0.18s ease,
+          box-shadow 0.18s ease;
+      }
+      .history-slider:hover::-moz-range-thumb,
+      .history-slider:active::-moz-range-thumb {
+        width: 16px;
+        height: 16px;
+        box-shadow: 0 0 18px rgba(0, 229, 200, 0.55);
+      }
+      /* Pulsing halo when value differs from default */
+      @keyframes historyPulse {
+        0%, 100% {
+          box-shadow: 0 0 12px rgba(0, 229, 200, 0.4);
+        }
+        50% {
+          box-shadow: 0 0 22px rgba(0, 229, 200, 0.65);
+        }
+      }
+      .history-slider.modified::-webkit-slider-thumb {
+        animation: historyPulse 2.4s ease-in-out infinite;
+      }
+      .history-slider.modified::-moz-range-thumb {
+        animation: historyPulse 2.4s ease-in-out infinite;
+      }
+      /* Numeric readout */
+      .history-readout {
+        font-family: var(--font-mono);
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: var(--biolum);
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+      .history-readout .sep,
+      .history-readout .total {
+        color: var(--foam);
+        opacity: 0.55;
+      }
+      /* Reset button — reuses .nav-pill look */
+      .history-reset {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.35rem 0.85rem;
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--foam);
+        background: var(--trench);
+        border: 1px solid var(--current);
+        border-radius: 100px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        white-space: nowrap;
+      }
+      .history-reset:hover {
+        color: var(--white);
+        background: var(--slate);
+        border-color: var(--biolum);
+        box-shadow: 0 0 12px rgba(0, 229, 200, 0.15);
+      }
+      .history-reset[disabled] {
+        opacity: 0.35;
+        cursor: default;
+        box-shadow: none;
+        border-color: var(--current);
+        background: var(--trench);
+        color: var(--foam);
+      }
+      @media (max-width: 720px) {
+        .history-row {
+          flex-wrap: wrap;
+          gap: 0.6rem 1rem;
+        }
+        .history-label {
+          display: none;
+        }
+        .history-slider-wrap {
+          flex: 1 1 100%;
+          max-width: none;
+          order: 2;
+        }
+        .history-readout {
+          order: 1;
+        }
+        .history-reset {
+          order: 1;
+          margin-left: auto;
+        }
+      }
+
       /* ── Main content ──────────────────────────────── */
       .content {
         max-width: 95vw;
@@ -733,6 +919,27 @@
       <div class="nav-pills" id="nav-pills">
         <!-- filled by JS -->
       </div>
+      <div class="history-row">
+        <div class="history-label">History Window</div>
+        <div class="history-slider-wrap">
+          <input
+            type="range"
+            class="history-slider"
+            id="history-slider"
+            min="5"
+            max="20"
+            step="1"
+            value="20"
+            aria-label="Number of commits shown in charts"
+          />
+        </div>
+        <div class="history-readout" id="history-readout">
+          <span class="current">20</span><span class="sep"> / </span><span class="total">20</span>
+        </div>
+        <button type="button" class="history-reset" id="history-reset" disabled>
+          Reset
+        </button>
+      </div>
     </nav>
 
     <!-- ── Charts ──────────────────────────────────── -->
@@ -782,7 +989,17 @@
           "#8bc34a", // lime
         ];
 
-        const MAX_COMMITS = 20;
+        const DEFAULT_MAX_COMMITS = 20;
+        const MIN_COMMITS = 5;
+
+        /* ── Mutable view state ───────────────────── */
+        const state = {
+          maxCommits: DEFAULT_MAX_COMMITS,
+          totalCommits: DEFAULT_MAX_COMMITS,
+        };
+
+        /* ── Chart registry (for live re-windowing) ─ */
+        const chartRegistry = [];
 
         /* ── Section descriptions ─────────────────── */
         const DESCRIPTIONS = {
@@ -834,7 +1051,26 @@
 
           /* ── Stats ───────────────────────────────── */
           const entries = data.entries[Object.keys(data.entries)[0]];
-          const totalCommits = entries.length;
+          // Use the largest entry length across all benchmark groups so the
+          // slider can scrub across the full available history even if some
+          // groups have fewer recorded runs.
+          const totalCommits = Math.max(
+            ...Object.values(data.entries).map((e) => e.length)
+          );
+          state.totalCommits = totalCommits;
+
+          // Bootstrap initial window size: ?n= URL param, clamped to [MIN, total]
+          const params = new URLSearchParams(window.location.search);
+          const requested = parseInt(params.get("n"), 10);
+          if (Number.isFinite(requested)) {
+            state.maxCommits = Math.max(
+              MIN_COMMITS,
+              Math.min(requested, totalCommits)
+            );
+          } else {
+            state.maxCommits = Math.min(DEFAULT_MAX_COMMITS, totalCommits);
+          }
+
           const totalBenches = entries.reduce(
             (s, e) => s + e.benches.length,
             0
@@ -1148,9 +1384,14 @@
               });
             }
           }
-          const sorted = [...allCommits.values()]
-            .sort((a, b) => a.date - b.date)
-            .slice(-MAX_COMMITS);
+          // Full sorted commit list — we keep the full list and slice on demand
+          // so the slider can re-window without recomputing the hierarchy.
+          const fullSorted = [...allCommits.values()].sort(
+            (a, b) => a.date - b.date
+          );
+          // Mutable view object: shared by closures (tooltip, onClick) and the
+          // slider's applyWindow() so re-windowing updates everything in lockstep.
+          const view = { sorted: fullSorted.slice(-state.maxCommits) };
 
           const variantNames = [...variantMap.keys()].sort();
           const datasets = [];
@@ -1176,7 +1417,7 @@
 
             datasets.push({
               label: cleanKernel(name.trim()),
-              data: sorted.map((c) => {
+              data: view.sorted.map((c) => {
                 const r = commitMap.get(c.id);
                 return r ? r.bench.value : null;
               }),
@@ -1195,10 +1436,10 @@
             variantIndices.set(i, name);
           });
 
-          new Chart(canvas, {
+          const chart = new Chart(canvas, {
             type: "line",
             data: {
-              labels: sorted.map((c) => c.id.slice(0, 7)),
+              labels: view.sorted.map((c) => c.id.slice(0, 7)),
               datasets,
             },
             options: {
@@ -1244,7 +1485,7 @@
                     afterTitle: function (items) {
                       if (!items.length) return "";
                       const idx = items[0].dataIndex;
-                      const commit = sorted[idx].commit;
+                      const commit = view.sorted[idx].commit;
                       return (
                         commit.message.split("\n")[0].slice(0, 72) +
                         "\n" +
@@ -1322,11 +1563,14 @@
               onClick: function (_event, elements) {
                 if (!elements.length) return;
                 const idx = elements[0].index;
-                const commit = sorted[idx].commit;
+                const commit = view.sorted[idx].commit;
                 if (commit.url) window.open(commit.url, "_blank");
               },
             },
           });
+
+          // Register so the slider can re-window without rebuilding the DOM.
+          chartRegistry.push({ chart, variantMap, fullSorted, view });
         }
 
         function cleanKernel(s) {
@@ -1346,6 +1590,95 @@
 
         /* ── Go ───────────────────────────────────── */
         render(init());
+        setupHistorySlider();
+
+        /* ── History window slider ────────────────── */
+        function setupHistorySlider() {
+          const slider = document.getElementById("history-slider");
+          const readout = document.getElementById("history-readout");
+          const reset = document.getElementById("history-reset");
+          if (!slider || !readout || !reset) return;
+
+          const currentEl = readout.querySelector(".current");
+          const totalEl = readout.querySelector(".total");
+
+          slider.min = String(MIN_COMMITS);
+          slider.max = String(state.totalCommits);
+          slider.value = String(state.maxCommits);
+          totalEl.textContent = String(state.totalCommits);
+
+          function syncReadoutAndFill() {
+            const v = state.maxCommits;
+            currentEl.textContent = String(v);
+            const range = state.totalCommits - MIN_COMMITS;
+            const pct = range > 0 ? ((v - MIN_COMMITS) / range) * 100 : 100;
+            slider.style.setProperty("--pct", pct + "%");
+
+            const isDefault =
+              v === Math.min(DEFAULT_MAX_COMMITS, state.totalCommits);
+            slider.classList.toggle("modified", !isDefault);
+            reset.disabled = isDefault;
+          }
+
+          function applyWindow() {
+            for (const entry of chartRegistry) {
+              entry.view.sorted = entry.fullSorted.slice(-state.maxCommits);
+              entry.chart.data.labels = entry.view.sorted.map((c) =>
+                c.id.slice(0, 7)
+              );
+              const variantNames = [...entry.variantMap.keys()].sort();
+              variantNames.forEach((name, i) => {
+                const commitMap = new Map(
+                  entry.variantMap.get(name).map((r) => [r.commit.id, r])
+                );
+                entry.chart.data.datasets[i].data = entry.view.sorted.map(
+                  (c) => {
+                    const r = commitMap.get(c.id);
+                    return r ? r.bench.value : null;
+                  }
+                );
+              });
+              entry.chart.update("none");
+            }
+          }
+
+          syncReadoutAndFill();
+
+          slider.addEventListener("input", () => {
+            const v = parseInt(slider.value, 10);
+            if (!Number.isFinite(v) || v === state.maxCommits) return;
+            state.maxCommits = v;
+            syncReadoutAndFill();
+            applyWindow();
+          });
+
+          // Only update the URL when the user releases the slider, to avoid
+          // hammering history.replaceState during a drag.
+          slider.addEventListener("change", () => {
+            const url = new URL(window.location.href);
+            const isDefault =
+              state.maxCommits ===
+              Math.min(DEFAULT_MAX_COMMITS, state.totalCommits);
+            if (isDefault) {
+              url.searchParams.delete("n");
+            } else {
+              url.searchParams.set("n", String(state.maxCommits));
+            }
+            window.history.replaceState({}, "", url);
+          });
+
+          reset.addEventListener("click", () => {
+            const def = Math.min(DEFAULT_MAX_COMMITS, state.totalCommits);
+            if (state.maxCommits === def) return;
+            state.maxCommits = def;
+            slider.value = String(def);
+            syncReadoutAndFill();
+            applyWindow();
+            const url = new URL(window.location.href);
+            url.searchParams.delete("n");
+            window.history.replaceState({}, "", url);
+          });
+        }
 
         /* ── Commit popover ───────────────────────── */
         const popover = document.createElement("div");
