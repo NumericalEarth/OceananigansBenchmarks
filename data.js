@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775702775580,
+  "lastUpdate": 1775708361568,
   "repoUrl": "https://github.com/CliMA/Oceananigans.jl",
   "entries": {
     "Oceananigans.jl Benchmarks": [
@@ -5584,6 +5584,188 @@ window.BENCHMARK_DATA = {
           {
             "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
             "value": 0.07925852198,
+            "unit": "s/timestep"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Benoît Pasquier",
+            "username": "briochemc",
+            "email": "4486578+briochemc@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "f21a80bbb8947aa0c263ae683e9602a3c6211467",
+          "message": "Fix distributed tripolar fold (#5439)\n\n* Add distributed fold topology types and fix tripolar halo fill\n\nIntroduce 4 new topology types for distributed tripolar grid fold boundaries:\n- LeftConnectedRightCenterFolded (1xN UPivot)\n- LeftConnectedRightFaceFolded (1xN FPivot, Face-extended)\n- LeftConnectedRightCenterConnected{WestOfPivot/EastOfPivot} (MxN UPivot)\n- LeftConnectedRightFaceConnected{WestOfPivot/EastOfPivot} (MxN FPivot, Face-extended)\n\nThese replace the previous FullyConnected y-topology on northernmost distributed\nranks, which lost fold information and caused FPivot CF/FF fields to crash (OOB)\nbecause they need Ny+1 Face points.\n\nKey changes:\n- Grids.jl: new types, WestOfPivot/EastOfPivot, global_fold_topology()\n- grid_utils.jl: BoundedTopology union includes Face-extended fold types\n- distributed_grids.jl: insert_connected_topology 5-arg methods for fold topologies\n- distributed_zipper.jl: complete rewrite with topology-based buffer dispatch,\n  corrected y-ranges for Face-extended grids, fold-line WoP/EoP handling\n- Tripolar struct simplified to 3 type params (fold info now in grid topology)\n- Split-explicit, advection, and BC unions updated for new types\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* Store fold topology in Tripolar type parameter and fix distributed halo fill\n\n- Make Tripolar{N,F,S,FT} carry the fold topology as a phantom type\n  parameter (isbits for GPU). Add fold_topology() getter, remove\n  global_fold_topology() which could not resolve the fold type from\n  non-fold rank topologies (FullyConnected, RightConnected).\n\n- Fix reconstruct_global_grid and with_halo for distributed TripolarGrid:\n  pass fold_topology from conformal_mapping so FPivot grids reconstruct\n  correctly (was defaulting to RightCenterFolded).\n\n- Fix distributed zipper corner buffers: use has_fold_line to size\n  corner buffers (Hy+1 when fold line present), dispatch on\n  TwoDZipperBuffer only (corners not needed for 1D partitions),\n  remove redundant arch::Distributed constraint, rename H→Hy.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* Replace WestOfPivot/EastOfPivot with per-buffer FL/WFL fold-line dispatch\n\nRemove the WestOfPivot/EastOfPivot type parameter from topology types\nand replace with per-buffer fold-line control via two new type parameters\non TwoDZipperBuffer and ZipperCornerBuffer:\n\n- FL (fold line in buffer): true when the buffer contains the fold-line\n  row (Hy+1 rows). Set to has_fold_line() for ALL buffers to ensure MPI\n  size matching between mirror partners.\n\n- WFL (writes fold line): true when the recv should write the fold-line\n  row. Computed per-buffer from the rank's x-position relative to the\n  pivot (Nx/2), accounting for periodic wrap at domain boundaries.\n\nHelper functions north_writes_fold_line, northwest_writes_fold_line,\nnortheast_writes_fold_line determine WFL based on rx and Rx.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* Replace WestOfPivot/EastOfPivot with per-buffer FL/WFL fold-line dispatch\n\n- Remove WestOfPivot/EastOfPivot type parameters and pivot_side function\n- Add FL (fold-line in buffer) and WFL (writes fold line) type parameters\n  to TwoDZipperBuffer and ZipperCornerBuffer\n- Per-buffer fold-line helpers: north/northwest/northeast_writes_fold_line\n  accounting for both pivot points (x-periodicity)\n- TripolarXBuffer with location-aware y-size using length(loc_y, topo, Ny)\n  instead of has_fold_line (only FPivot Face-y gets Ny+1, not UPivot)\n- Temporary @info diagnostics for send/recv tracing (to be removed)\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* Remove temporary @info diagnostics from distributed_zipper.jl\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* Complementary x-buffer fold-line handling with FL/WFL on TripolarXBuffer\n\nAdd FL/WFL type parameters to TripolarXBuffer, mirroring the north/corner\nbuffer pattern. The west/east x-buffers complement the adjacent NW/NE\ncorner: if the corner writes the fold line, the x-buffer skips it (and\nvice versa), ensuring no overlapping writes with async MPI.\n\nSeparate west_tripolar_buffer and east_tripolar_buffer constructors since\nthey complement different corners (NW vs NE).\n\nRemaining: Face-x pivot point (global x = Nx/2+1) at the fold line is\nunfilled in distributed because it falls in the gap between the NE corner\n(Hx-1 columns) and the east x-buffer (WFL=false). This only affects the\nexact pivot point which is under land in real ocean configurations.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* Remove leftover debug variable from FC UPivot north recv\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* Replace zipper_bc with north_fold_boundary_condition, remove redundant ZBC\n\n- Remove local zipper_bc function (duplicated north_fold_boundary_condition)\n- Use north_fold_boundary_condition(fold_topology(...))(sign) directly\n- Remove local const ZBC (already defined in BoundaryConditions)\n- Import ZBC from BoundaryConditions\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* Remove unnecessary <: from north_fold_boundary_condition for concrete types\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* formatting\n\n* Update src/OrthogonalSphericalShellGrids/tripolar_grid.jl\n\nCo-authored-by: Simone Silvestri <silvestri.simone0@gmail.com>\n\n* Simplify distributed_zipper.jl and fix FPivot kernel coverage\n\n- Refactor distributed_zipper.jl: replace ~65 combinatorial send/recv methods\n  with ~20 using helper functions for y-ranges, x-ranges, and type-parameter\n  accessors. Move FL/WFL to front of type parameter list for clean dispatch.\n  Consolidate 4 corner buffer constructors into 2.\n\n- Fix FPivot distributed simulation mismatch: extend async buffer tendency\n  kernel parameters to use worksize(grid) instead of size(grid), ensuring the\n  fold line at Ny+1 is covered by the buffer pass for RightFaceFolded grids.\n\n- Add worksize override for distributed FPivot grids (DRFTRG) so kernels\n  correctly operate on the extra Face-y row at Ny+1.\n\n- Remove stale explicit imports (FZBC, UZBC, RightConnected,\n  instantiated_location) and fix self-qualified fold_topology access.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* Remove stale UPivot fold BC overrides from test utils\n\nThe overrides were modifying the serial fold BC to skip the fold-line\nconsistency substitution, which is no longer needed now that the\ndistributed fold handles this correctly.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* Fix self-qualified fold_topology access by inlining into keyword argument\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* Apply suggestions from code review\n\nCo-authored-by: Simone Silvestri <silvestri.simone0@gmail.com>\n\n* Fix fold topology type: FT -> TY\n\n* Remove unused methods\n\n* import fill_halo_regions!\n\n* Remove dead OneDZipperBuffer code\n\nOneDZipperBuffer was never constructed because slab partitions (Rx=1) use\nthe serial fold BC directly, not a DistributedZipper. The OneDFoldTopology\n+ DistributedZipper combination was impossible. Re-add loc_id import needed\nby distributed_zipper_north_tags.jl.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* Fix missing comma in using statement in SplitExplicitFreeSurfaces\n\n* Add RightFaceFolded (FPivot) coverage to distributed tripolar MPI tests\n\nLoop over both fold topologies (RightCenterFolded, RightFaceFolded) in\ngrid reconstruction, field reconstruction, boundary condition, and\nsimulation tests. The run_distributed_tripolar_grid helper now requires\nan explicit fold_topology keyword argument.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* Fix analytical_immersed_tripolar_grid southern masking for FPivot grids\n\nUse φ < φm + radius instead of φ < φm to immerse the southernmost row\non RightFaceFolded grids, where southernmost_latitude sits at the cell\nface so j=1 centers are slightly north of φm. Without this, the tracer\nfield diverges between serial and distributed runs on FPivot grids.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* Apply suggestions from code review\n\nCo-authored-by: Simone Silvestri <silvestri.simone0@gmail.com>\n\n* declutter line for north BC\n\n* Use TY throughout for fold_topology type\n\n* Remove misplaced comment\n\n* declutter + clearer helper function names + simplify dispatch\n\n* `lx` -> `ℓx` and `Topo` -> `TY`\n\n---------\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\nCo-authored-by: Simone Silvestri <silvestri.simone0@gmail.com>",
+          "timestamp": "2026-04-09T01:42:31Z",
+          "url": "https://github.com/CliMA/Oceananigans.jl/commit/f21a80bbb8947aa0c263ae683e9602a3c6211467"
+        },
+        "date": 1775708361066,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Default/tripolar 360x180x50 F64/NVIDIA TITAN V/default",
+            "value": 0.07911291280999999,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gu_",
+            "value": 3.945375,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gv_",
+            "value": 3.7896475,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 2.558965,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 2.529909,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 2.523093,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__rk_substep_turbulent_kinetic_energy_",
+            "value": 1.988472,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_CATKE_closure_fields_",
+            "value": 1.56561,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_w_from_continuity_",
+            "value": 0.342238,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_TKE_diffusivity_",
+            "value": 0.642109,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_split_explicit_transport_velocities_",
+            "value": 0.482558,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/180x90x50",
+            "value": 0.032977883879999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/720x360x50",
+            "value": 0.31153314565,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F32",
+            "value": 0.05272640333,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/nothing",
+            "value": 0.04965783886,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+Biharmonic",
+            "value": 0.10726668471,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+GM+Biharmonic",
+            "value": 0.28954337826,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/nothing+nothing",
+            "value": 0.03708726502,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant5+WENO5",
+            "value": 0.06507267717000001,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant9+WENO9",
+            "value": 0.11776303978,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon_zstar",
+            "value": 0.10127639258,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon_zstar",
+            "value": 0.08752156183,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar_zstar",
+            "value": 0.08447209826,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon",
+            "value": 0.0870398984,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon",
+            "value": 0.07876991134,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/3 tracers",
+            "value": 0.08774411335,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/360x180x50",
+            "value": 0.07911291280999999,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F64",
+            "value": 0.07911291280999999,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE",
+            "value": 0.07911291280999999,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariantDefault+WENO7",
+            "value": 0.07911291280999999,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar",
+            "value": 0.07911291280999999,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
+            "value": 0.07911291280999999,
             "unit": "s/timestep"
           }
         ]
