@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1777953113498,
+  "lastUpdate": 1777961331318,
   "repoUrl": "https://github.com/CliMA/Oceananigans.jl",
   "entries": {
     "Oceananigans.jl Benchmarks": [
@@ -10919,6 +10919,188 @@ window.BENCHMARK_DATA = {
           {
             "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
             "value": 0.07623301228,
+            "unit": "s/timestep"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Benoît Pasquier",
+            "username": "briochemc",
+            "email": "4486578+briochemc@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "636f88572a20cfcb036b74532f91f42d7cf9a7e9",
+          "message": "Fix show(field) + zipper BC validation for (distributed) tripolar grids (#5489)\n\n* Fix `show(field)` crash on 2x2 distributed tripolar grids\n\n`show` calls `maximum` which creates a reduced Field with (Nothing, Nothing, Nothing)\nlocation. On pencil-decomposed (Rx > 1) tripolar grids, the Field constructor injected\na DistributedZipper north BC for this reduced field, then `communication_buffers` called\n`has_fold_line(TY, Nothing)` which had no method.\n\nTwo fixes, matching the existing pattern from distributed LatitudeLongitudeGrid:\n1. `default_auxiliary_bc` returns `nothing` for Nothing y-location on tripolar grids\n2. The MPI tripolar Field constructor respects `nothing` north BCs instead of\n   overriding them with a zipper\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* Refactor distributed tripolar `Field` constructor to use multiple dispatch\n\nReplace if/else branching with dispatch on y-topology (`OneDFoldTopology` /\n`TwoDFoldTopology`) and incoming north BC. Extract `zipper_sign`, `with_north_bc`,\nand a tripolar-specific `inject_halo_communication_boundary_conditions`.\n\nBehavior is preserved across serial, slab, and pencil partitions (verified\nwith MWE — see #5503).\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* Enforce zipper north BC on tripolar grids (#5503)\n\nValidates that the north boundary of a (folded-y) tripolar grid is a\nZipper / distributed communication BC / nothing, both at Field construction\nand at the top of tripolar regularize_field_boundary_conditions. Drops the\nnow-dead location-based `sign(LX, LY)` fallback and simplifies `zipper_sign`.\n\n- Adds `FoldedTopology` union in Grids and the matching\n  `validate_boundary_condition_topology` methods (mirroring the Periodic\n  pattern), guarded on `side == :north`.\n- Accepts `DefaultBoundaryCondition` placeholders at the regularize-entry\n  validate so the model construction path isn't rejected before\n  placeholders resolve.\n- Passes `boundary_conditions = nothing` on the internal metric helper\n  Fields inside the `TripolarGrid` constructor so their default BCs\n  (NoFlux / Impenetrable on folded y) don't trip the new validator.\n- Documents the sign convention on `UPivot/FPivotZipperBoundaryCondition`\n  and adds a `!!! info \"North boundary condition\"` admonition to\n  `TripolarGrid`'s docstring.\n- Adds serial + distributed tests covering validation (TESTSET 4 in\n  gadi_test_env, plus test/test_tripolar_grid.jl).\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* Alt B: conditional north-BC override in tripolar regularize + dispatch cleanup\n\nRegularize no longer clobbers user-supplied north BCs. It only fills the\ndefault Zipper when the north slot holds a `DefaultBoundaryCondition`\nplaceholder (the model-construction path). A user-supplied north BC flows\nthrough untouched; invalid BCs are then caught downstream by Field's\n`validate_boundary_condition_topology` (the Periodic-style check). This\nremoves the need to validate at regularize entry and to accept\n`DefaultBoundaryCondition` in the FoldedTopology validator.\n\n- Replace the regularize-entry validate call + unconditional override with\n  7-arg `regularize_boundary_condition` overloads that pass `sign` through\n  and dispatch on BC type × grid y-topology. `DefaultBC` + fold-north\n  yields the right Zipper/DistributedZipper; user BCs pass through.\n- Refactor the fold-topology unions into a four-way split that matches\n  how each case is dispatched:\n    SerialFoldedTopology       — serial tripolar\n    SlabFoldedTopology         — distributed slab fold-north (Rx=1)\n    PencilFoldedTopology       — distributed pencil fold-north (Rx>1)\n    DistributedFoldedTopology  — Slab ∪ Pencil\n    FoldedTopology             — Serial ∪ Distributed (used for north-BC validation)\n  All live in `Grids/grid_utils.jl` and are exported. The previously\n  duplicate `DistributedFoldTopology` in `field_boundary_conditions.jl`\n  is deleted in favor of the shared `DistributedFoldedTopology`.\n- Add short dispatch aliases (`SerialFTG`, `SlabFTG`, `PencilFTG`,\n  `DistFTG`) to keep method signatures readable.\n- Update `north_zipper_bc` and `distributed_zipper.jl` dispatch to use\n  the renamed unions (`SlabFoldedTopology`, `DistributedPencilFoldedTopology`\n  → `PencilFoldedTopology`).\n- Update the test so it only exercises Field's validation path (Alt B\n  design: regularize deliberately doesn't throw on bad input).\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* Apply suggestions from code review\n\nCo-authored-by: Simone Silvestri <silvestri.simone0@gmail.com>\n\n* Apply remaining suggestions from code review\n\nFinish the SlabFTG/PencilFTG/DistFTG/SerialFTG → *TRG rename in dispatch\nsites that were missed when the const definitions were renamed, and drop\nthe UPivot/FPivot zipper BC docstrings (the constructor style here is\ndocstring-free, matching the other BC constructors in this file).\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Fix `new_data` import and drop stale `.data` accessors in tripolar_grid.jl\n\nThe `new_data` switch in 886e673d2 missed the import (CI hit\n`UndefVarError: new_data` on Reactant tests) and left `.data` accessors\nthat worked on `Field` but not on the raw `OffsetArray` that `new_data`\nreturns. Add `new_data` to the `Oceananigans.Grids` import block, and\ndrop `.data` from the eight `dropdims(λXX.data, dims=3)` calls.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Allocate tripolar coord buffers on CPU (matches CPU kernel launch)\n\nThe previous helper-`Field` path always allocated on CPU because the\nhelper `RectilinearGrid` was constructed without an `arch` argument\n(defaulting to CPU). The kernel `_compute_tripolar_coordinates!` is\nlaunched on `CPU()` and reads/writes CPU coordinate arrays\n(`λᶠᵃᵃ`, `φᵃᶜᵃ`, …). Restoring `CPU()` on `new_data` matches that\nbehavior and fixes a scalar-indexing failure on GPU.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Retrigger CI and docs build\n\n---------\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\nCo-authored-by: Simone Silvestri <silvestri.simone0@gmail.com>",
+          "timestamp": "2026-05-05T04:30:54Z",
+          "url": "https://github.com/CliMA/Oceananigans.jl/commit/636f88572a20cfcb036b74532f91f42d7cf9a7e9"
+        },
+        "date": 1777961331017,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Default/tripolar 360x180x50 F64/NVIDIA TITAN V/default",
+            "value": 0.07630903839,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gu_",
+            "value": 3.7432725,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gv_",
+            "value": 3.701177,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 2.336689,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 2.312434,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 2.30437,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__rk_substep_turbulent_kinetic_energy_",
+            "value": 1.988372,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_CATKE_closure_fields_",
+            "value": 1.565542,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_w_from_continuity_",
+            "value": 0.341085,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_TKE_diffusivity_",
+            "value": 0.64102,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_split_explicit_transport_velocities_",
+            "value": 0.482429,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/180x90x50",
+            "value": 0.029689187920000002,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/720x360x50",
+            "value": 0.29917500608,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F32",
+            "value": 0.06083858445,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/nothing",
+            "value": 0.047437647070000005,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+Biharmonic",
+            "value": 0.10370216917000001,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+GM+Biharmonic",
+            "value": 0.28572451861000003,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/nothing+nothing",
+            "value": 0.03705339498,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant5+WENO5",
+            "value": 0.06005129375,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant9+WENO9",
+            "value": 0.11009067816,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon_zstar",
+            "value": 0.09716951703,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon_zstar",
+            "value": 0.08313973167000001,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar_zstar",
+            "value": 0.08185239244,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon",
+            "value": 0.083179752,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon",
+            "value": 0.07578418711,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/3 tracers",
+            "value": 0.08422774488,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/360x180x50",
+            "value": 0.07630903839,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F64",
+            "value": 0.07630903839,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE",
+            "value": 0.07630903839,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariantDefault+WENO7",
+            "value": 0.07630903839,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar",
+            "value": 0.07630903839,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
+            "value": 0.07630903839,
             "unit": "s/timestep"
           }
         ]
