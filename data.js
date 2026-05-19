@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1779195589197,
+  "lastUpdate": 1779217009302,
   "repoUrl": "https://github.com/CliMA/Oceananigans.jl",
   "entries": {
     "Oceananigans.jl Benchmarks": [
@@ -13467,6 +13467,188 @@ window.BENCHMARK_DATA = {
           {
             "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
             "value": 0.056084528269999996,
+            "unit": "s/timestep"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Eliot Quon",
+            "username": "ewquon",
+            "email": "eliot@aeolus.earth"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "0a60f2a094266a44cd6728d6510ea11b38a44792",
+          "message": "Support `FieldTimeSeries` targets in `Relaxation` (#5575)\n\n* Support `FieldTimeSeries` targets in `Relaxation`\n\nAdds a discrete-form materialization path for `Relaxation(target=fts)`:\n`materialize_forcing` wraps the FTS in an internal `FieldTimeSeriesTarget`\nthat carries the simulation-side location and the integer index of the\nforced field in `model_fields`. The new kernel callable\n(`Relaxation{R,M,<:FieldTimeSeriesTarget}`) reads `ϕ` from\n`model_fields[index][i,j,k]` and obtains the reference value via\n`interpolate(X, Time(t), fts, ...)`, so the FTS can live on a different\ngrid than the simulation as long as its extent brackets the simulation\ngrid in x, y, and z. Mismatch throws `ArgumentError` at materialize time.\n\nThe existing callable / `Number` `target` path is untouched.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Test `Relaxation` with `FieldTimeSeries` target\n\nMaterialization wires the FTS into a `FieldTimeSeriesTarget` with the\nforced field's location and the right `model_fields` index; analytical\nconvergence after one Euler step matches `c_ref·(1 − exp(−Δt/τ))` to\n~1e-6 relative error; smaller-FTS extent throws `ArgumentError`.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Document `Relaxation` with `FieldTimeSeries` target\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Follow underscore convention\n\n* Cleanup\n\n* Drop .0s\n\n* Test cross-grid + temporal FTS interp; tighten extent validator\n\nAdds two testsets to `test_forcings.jl` exercising the FTS-target\n`Relaxation` interpolation paths separately:\n\n- Cross-grid spatial interp: coarse 8×8×4 FTS (padded extent so\n  FTS Centers bracket sim Centers) driving a fine 32×32×4 sim\n  against a time-invariant linear-in-x target. Asserts interior\n  cells stay zero (mask = 0) and fringe cells match the one-step\n  exponential ODE solution to `rtol = 1e-3`.\n- Temporal interp: matched grids, spatially-uniform linear-in-time\n  target, multi-substep RK3. Asserts each fringe cell matches the\n  analytic linear-driver ODE solution\n  `c(t) = t − τ_eff + τ_eff · exp(−t/τ_eff)`.\n\nTwo new helpers (`spatial_test_fts`, `temporal_test_fts`) build\nFTS snapshots from analytic functions and call `fill_halo_regions!`\nafter `set!` as a defensive measure.\n\nTightens `validate_fts_target_extent` to use `instantiated_location`\nfor both the FTS and the forced field instead of hardcoded `Face()`\non both sides. The original `Face()` check was too lax: with a\ncoarser FTS than the sim (the reanalysis-driving-LES use case),\nsim boundary cells could fall outside the FTS *Center* coverage\nand the trilinear lookup would silently read zero-initialized FTS\nhalos, producing wrong values without throwing. The new check\ncatches this at materialize time.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Fix doctest and unused import in Forcings/relaxation.jl\n\nTwo unrelated CI failures from PR #5575 caused by the merge from main:\n\n- `bottom_sponge_layer` doctest expected integer-literal output (`(z + 100)^2`,\n  `25^2`, `20 + 0.001 * z`) but the runtime prints float-promoted forms\n  (`100.0`, `25.0`, `20.0`). Main had already updated the expected output;\n  the merge from main into this branch resolved the conflict by keeping the\n  stale \"ours\" version. Bringing the expected output back in line with main.\n\n- The `Face` import from Oceananigans.Grids became unused after\n  `validate_fts_target_extent` was tightened from `Face()`-bracket to\n  location-aware bracket checking. ExplicitImports' `check_no_stale_explicit_imports`\n  flagged this in `test_quality_assurance.jl`, causing `cpu-unit-tests` and\n  `gpu-unit-tests` to fail.\n\nVerified locally: `doctest(nothing, [Oceananigans.Forcings])` and\n`include(\"test/test_quality_assurance.jl\")` both pass.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Add Adapt methods for Relaxation and FieldTimeSeriesTarget\n\nGPU kernel compilation fails with \"KernelError: passing non-bitstype\nargument\" when an FTS-target `Relaxation` is launched: the kernel\nreceives the host-side `Relaxation` struct unchanged, which contains a\nnested `FieldTimeSeries` whose `.data.parent` is a `CuArray`. `CuArray`\ncarries reference-counting state (`GPUArrays.DataRef`, `RefCounted`,\n`Atomic`, finalizer) that is not isbits.\n\nAdapt.jl's default for an unannotated type is to return the value\nunchanged. Adding explicit `Adapt.adapt_structure` for `Relaxation` and\n`FieldTimeSeriesTarget` routes the adapt recursion through the inner\n`FieldTimeSeries`, which has its own adapt method that converts\n`CuArray` to `CuDeviceArray` (and switches the type to\n`GPUAdaptedFieldTimeSeries`). The kernel then receives an isbits\nargument.\n\nDiagnosed from a user-supplied reproducer on a CUDA GPU:\n\n    grid = RectilinearGrid(GPU(), Float64; size=(2,2,4), extent=(100,100,1000))\n    fts  = FieldTimeSeries{Center, Center, Center}(grid, [0, 1e6])\n    for n in eachindex(fts.times); set!(fts[n], 5); end\n    r = Relaxation(rate=1/60, target=fts)\n    model = NonhydrostaticModel(grid; tracers=:c, forcing=(; c=r))\n    # errors during update_state! with the isbits report.\n\nCPU path verified unchanged.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Lift FieldTimeSeriesTarget index to a type parameter\n\nAfter fixing Adapt (777c26f11), the GPU compilation moved past the\nisbits check but failed at the next step with:\n\n    InvalidIRError: unsupported call to an unknown function\n    (call to jl_f_getfield)\n\nThe cause is `model_fields[target.index][i, j, k]` in the kernel\ncallable: `model_fields` is a heterogeneous `NamedTuple` (different\nconcrete `Field` types for each key) and `target.index` is a runtime\n`Int`, so the load is type-unstable. CPU handles this via dynamic\ndispatch; CUDA PTX cannot lower a runtime `jl_f_getfield` and aborts.\n\nLift `index` from a runtime `Int` struct field into a type parameter\n`I::Int` on `FieldTimeSeriesTarget{L, F, I}`. The kernel uses a small\nhelper `_field_index(target)` that extracts `I` from the type, so\n`model_fields[_field_index(target)]` is a compile-time index. Each\nforced field gets its own specialized kernel — fine in practice\nbecause the number of forced fields per model is small.\n\nThis also matches @glwagner's caveat on the original review of #5575:\n\n  > Switching to this design does preclude the future possibility of\n  > an optimization that embeds the field index as a type parameter\n  > (so the compiler can infer `fields[field_index]`).\n\nIt turns out the \"future optimization\" isn't optional on GPU.\n\nThe Adapt method is updated to extract `I` from the type parameter and\nreinject it as the index argument so the adapted struct preserves the\nstatic-index property.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Cache fts.grid on FieldTimeSeriesTarget for GPU access\n\nAfter the type-param lift (a550ea2a3), GPU compilation still failed\nwith `unsupported call to jl_f_getfield` — pointing at the `fts.grid`\naccess in the kernel callable. `GPUAdaptedFieldTimeSeries` (the type\nthe FTS becomes after `Adapt.adapt_structure`) does not carry a `grid`\nfield — only `data`, `times`, `backend`, `time_indexing`. The\n`getproperty(fts_gpu, :grid)` therefore dynamic-dispatches on the host\nbut fails to lower on PTX.\n\nCache `field_time_series.grid` as an explicit field `fts_grid` on\n`FieldTimeSeriesTarget` (with its own `G` type parameter) so the kernel\nreads `target.fts_grid` instead of `fts.grid`. The Adapt method adapts\nthe grid in place — `RectilinearGrid` already has an adapt method that\nconverts it to a GPU-compatible form. The 3-arg outer constructor\npreserves the materialize_forcing call site: it pulls `fts.grid` from\nthe host-side FTS at construction time.\n\nCPU smoke test verified: same `max|c|` as before.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Fix Base.summary on FieldTimeSeriesTarget after index-to-type-param lift\n\nCommit a550ea2a3 lifted `FieldTimeSeriesTarget.index` from a struct\nfield into the type parameter `I::Int`, but the existing\n`Base.summary(::FieldTimeSeriesTarget)` still read `target.index`,\nproducing a `getproperty` error on access. This broke the\n`forcing_functions.md` jldoctest that exercised the summary, causing\nthe `documentation` CI job to fail (exit status 1).\n\nSwitch the summary to use the `_field_index(target)` helper which\nextracts the index from the type parameter. The doctest expected\noutput is unchanged.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Retrigger CI\n\n* Apply suggestions from code review\n\nCo-authored-by: Mosè Giordano <765740+giordano@users.noreply.github.com>\n\n* fix whitespace\n\n---------\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\nCo-authored-by: Mosè Giordano <765740+giordano@users.noreply.github.com>",
+          "timestamp": "2026-05-19T17:17:25Z",
+          "url": "https://github.com/CliMA/Oceananigans.jl/commit/0a60f2a094266a44cd6728d6510ea11b38a44792"
+        },
+        "date": 1779217008657,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Default/tripolar 360x180x50 F64/NVIDIA TITAN V/default",
+            "value": 0.05589600251,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gu_",
+            "value": 2.45704,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gv_",
+            "value": 2.171939,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__rk_substep_turbulent_kinetic_energy_",
+            "value": 1.984371,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_CATKE_closure_fields_",
+            "value": 1.594806,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.984602,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.979226,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.977145,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_w_from_continuity_",
+            "value": 0.338238,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_TKE_diffusivity_",
+            "value": 0.644476,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_split_explicit_transport_velocities_",
+            "value": 0.481596,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/180x90x50",
+            "value": 0.032618014199999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/720x360x50",
+            "value": 0.21477484504,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F32",
+            "value": 0.04604232118,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/nothing",
+            "value": 0.03386008553,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+Biharmonic",
+            "value": 0.07921853101,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+GM+Biharmonic",
+            "value": 0.25912972577000004,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/nothing+nothing",
+            "value": 0.03703366463,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant5+WENO5",
+            "value": 0.049668858,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant9+WENO9",
+            "value": 0.07510807847999999,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon_zstar",
+            "value": 0.0717301461,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon_zstar",
+            "value": 0.061138889489999994,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar_zstar",
+            "value": 0.06267704664,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon",
+            "value": 0.05741578202,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon",
+            "value": 0.05409190377,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/3 tracers",
+            "value": 0.059880507529999995,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/360x180x50",
+            "value": 0.05589600251,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F64",
+            "value": 0.05589600251,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE",
+            "value": 0.05589600251,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariantDefault+WENO7",
+            "value": 0.05589600251,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar",
+            "value": 0.05589600251,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
+            "value": 0.05589600251,
             "unit": "s/timestep"
           }
         ]
