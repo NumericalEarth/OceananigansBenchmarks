@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1779282223404,
+  "lastUpdate": 1779307318858,
   "repoUrl": "https://github.com/CliMA/Oceananigans.jl",
   "entries": {
     "Oceananigans.jl Benchmarks": [
@@ -14377,6 +14377,188 @@ window.BENCHMARK_DATA = {
           {
             "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
             "value": 0.057884715340000004,
+            "unit": "s/timestep"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Gregory L. Wagner",
+            "username": "glwagner",
+            "email": "wagner.greg@gmail.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "5143361be6666557a6bf26e4e35fc05e5e6e6e1c",
+          "message": "Add ZarrWriter and FieldTimeSeries Zarr reader (#5605)\n\n* Add ZarrWriter and FieldTimeSeries Zarr reader\n\nImplements `ZarrWriter` as a new output writer backed by Zarr.jl, alongside\nJLD2Writer and NetCDFWriter. Lives in an extension that triggers on `using Zarr`.\n\nCloses #3821.\n\n## Layout\n\nLean-chunked, non-CF: each output is a chunked Zarr array of shape\n`(spatial..., Nt)` growing along the time axis. `_ARRAY_DIMENSIONS` set to\n`trilocation_dim_name`-style names (reversed for C-order). Grid reconstruction\nserialized as JSON in a `grid/` (or `grid_<n>/` for multi-grid) subgroup.\nCF compliance left additive for a follow-up.\n\n## Features\n\n- Inputs: `AbstractField`, `AbstractOperation`, `Reduction`, `WindowedTimeAverage`,\n  functions (with `dimensions` kwarg). Same surface as `JLD2Writer`.\n- Multi-grid support via unique-grid detection + per-output `grid_index` attr.\n- File splitting (`NoFileSplitting` / `FileSizeLimit` / `TimeInterval`).\n- Append-on-existing-store with dtype validation on restart.\n- Compression via user-supplied `compressor` kwarg (default `NoCompressor`).\n- Stores: `DirectoryStore` (default), `DictStore` (memory), `S3Store`. `ZipStore`\n  rejected on write with a clear error pointing at `Zarr.writezip` for the\n  finalize-to-zip workflow.\n- `FieldTimeSeries(path, name)` reader: auto-detects `.zarr` and `.zip`.\n- MPI distributed writes: per-axis GCD chunk default, rank-0-owned metadata\n  + time writes, lock-free per-rank chunk-aligned data writes,\n  rank-topology in `.zattrs` for restart validation. Particles rejected\n  under MPI in v1.\n\n## Tests\n\n- `test/test_zarr_writer.jl` — 108 serial tests across 7 testsets covering API\n  surface, raw round-trip, operations/reductions/functions/WindowedTimeAverage,\n  grid reconstruction + multi-grid, FieldTimeSeries reader, append + dtype\n  validation on restart, DictStore + ZipStore-read.\n- `test/test_distributed_zarr_writer.jl` + `test/distributed_zarr_writer_tests.jl`\n  — `mpiexec`-driven driver exercising Partition(x=2), Partition(y=2),\n  Partition(x=2, y=2); 15 passing tests.\n- `test/manual/test_zarr_s3.jl` — env-gated S3/MinIO smoke test (not in CI).\n\n## Benchmarks\n\nComparative scripts in `benchmark/zarr_writer/` (not part of CI) for running\nZarrWriter vs JLD2Writer vs NetCDFWriter on CPU.\n\n## Plan\n\n`zarr_writer_plan.md` documents the locked-in design decisions, on-disk layout,\nprior-art comparison (SpeedyWeather), forward-compatibility path to CF, and\nimplementation-phase status.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Switch langmuir_turbulence example to ZarrWriter\n\nConverts the Langmuir turbulence example to use `ZarrWriter` instead of\n`JLD2Writer`. The on-disk layout (chunked time-series arrays) is friendlier\nto chunked / parallel reads for LES-scale output.\n\nGPU + (128, 128, 64) grid + 4-hour run unchanged from upstream. Verified\nlocally on CPU with a reduced 32^3 grid + 20-minute run: both output stores\nmaterialize correctly (u, v, w, b + U, V, B, wu, wv averages), all\nFieldTimeSeries reads round-trip, locations and grids reconstruct, and time\narrays match the 5-minute output cadence.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Add Zarr to docs/Project.toml\n\nThe Langmuir turbulence example now `using Zarr`, so the docs project needs\nZarr to build.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Restrict ZarrExt's Field method dispatch to Zarr.ZArray\n\nThe reader's `Field(loc::Tuple, arr, name::String, time_index::Int; ...)` had\n`arr::Any`, which created a method ambiguity with the existing JLD2 method\n`Field(location, file::JLD2.JLDFile, name::String, iter; ...)`:\n  - `Field(loc::Tuple, arr::Any, ...)` is more specific on arg 1\n  - `Field(location::Any, file::JLD2.JLDFile, ...)` is more specific on arg 2\nNeither subsumes the other, so calls like `Field(loc, jldfile, name, iter)`\ninside `set_from_jld2!` dispatched into the Zarr extension's method by chance\nof ambiguity resolution, hit `ndims(jldfile)` and errored.\n\nRestricting `arr::Zarr.ZArray` resolves the ambiguity: the Zarr method matches\nonly when both args 1 and 2 are right; the JLD2 method matches only when arg 2\nis a JLDFile.\n\nFixes the `cpu/gpu-simulation-tests` and OutputReaders errors (19 errored\ntests locally; reproduced.)\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* rm benchmarks\n\n* Delete zarr_writer_plan.md\n\n---------\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-20T18:28:31Z",
+          "url": "https://github.com/CliMA/Oceananigans.jl/commit/5143361be6666557a6bf26e4e35fc05e5e6e6e1c"
+        },
+        "date": 1779307318143,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Default/tripolar 360x180x50 F64/NVIDIA TITAN V/default",
+            "value": 0.05577955373,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gu_",
+            "value": 2.454354,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gv_",
+            "value": 2.170163,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__rk_substep_turbulent_kinetic_energy_",
+            "value": 1.989652,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_CATKE_closure_fields_",
+            "value": 1.590135,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.984506,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.979738,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.978651,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_w_from_continuity_",
+            "value": 0.338463,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_TKE_diffusivity_",
+            "value": 0.64134,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_split_explicit_transport_velocities_",
+            "value": 0.487037,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/180x90x50",
+            "value": 0.0316674121,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/720x360x50",
+            "value": 0.21506559724,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F32",
+            "value": 0.044192973249999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/nothing",
+            "value": 0.03209938271,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+Biharmonic",
+            "value": 0.07938759046999999,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+GM+Biharmonic",
+            "value": 0.25915732589,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/nothing+nothing",
+            "value": 0.03735434093,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant5+WENO5",
+            "value": 0.04968229523,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant9+WENO9",
+            "value": 0.07527924278999999,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon_zstar",
+            "value": 0.07008204205,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon_zstar",
+            "value": 0.0609949333,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar_zstar",
+            "value": 0.06254710679,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon",
+            "value": 0.05745778053,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon",
+            "value": 0.054171437229999994,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/3 tracers",
+            "value": 0.059800455020000004,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/360x180x50",
+            "value": 0.05577955373,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F64",
+            "value": 0.05577955373,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE",
+            "value": 0.05577955373,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariantDefault+WENO7",
+            "value": 0.05577955373,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar",
+            "value": 0.05577955373,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
+            "value": 0.05577955373,
             "unit": "s/timestep"
           }
         ]
