@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1779339137153,
+  "lastUpdate": 1779344770569,
   "repoUrl": "https://github.com/CliMA/Oceananigans.jl",
   "entries": {
     "Oceananigans.jl Benchmarks": [
@@ -15287,6 +15287,188 @@ window.BENCHMARK_DATA = {
           {
             "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
             "value": 0.060379741640000005,
+            "unit": "s/timestep"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Gregory L. Wagner",
+            "username": "glwagner",
+            "email": "wagner.greg@gmail.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "53d66ef14eac863baf0eeb3f223248fea1e01e2e",
+          "message": "Support OrthogonalSphericalShellGrid in NetCDFWriter (CF §5.2 + MutableVerticalDiscretization plumbing) (#5581)\n\n* NetCDFWriter: support OrthogonalSphericalShellGrid (CF §5.2 aux coords) + MVD plumbing\n\nAdds NetCDFWriter support for `OrthogonalSphericalShellGrid` (covering\n`TripolarGrid`, `RotatedLatitudeLongitudeGrid`, and `ConformalCubedSpherePanelGrid`),\nfollowing CF Conventions §5.2 for 2D curvilinear coordinates:\n\n- Bare logical-index dimensions `i_caa`/`i_faa`/`j_aca`/`j_afa` (defDim only,\n  no coordinate variable on them).\n- Eight 2D auxiliary coordinate variables `λ_cca`/`λ_fca`/`λ_cfa`/`λ_ffa`\n  and `φ_*` at each Arakawa-C stagger location, dimensioned `(i_*, j_*)`.\n- Each OSSG data field carries a `coordinates = \"λ_** φ_** z_aac\"` attribute\n  so xarray/ncview/Panoply pick up the right lat/lon.\n\n`MutableVerticalDiscretization`: the reference (Lagrangian) coordinate is now\nwritten as `r_aac`/`r_aaf` (rather than `z_*`), reflecting that physical\n`z = z(r, η, …)` is reconstructed from the static reference and the time-varying\nfree surface. Vertical-name dispatch goes through a new\n`vertical_coordinate_name(::AbstractVerticalCoordinate)` helper plumbed through\nexisting call sites; `StaticVerticalDiscretization` is unaffected.\n\nArchitectural changes touching all grids:\n\n- `create_spatial_dimensions!` now accepts entries of shape `(array, dims)` so\n  that 2D auxiliary coords can sit on bare 1D dimensions. The 1D coord-variable\n  case (Rectilinear, LLG, vertical) is wrapped via a `nc_variable` helper and\n  behaves identically to before.\n- `create_field_dimensions!` skips per-field recreation when dims already exist\n  in the dataset (the common path through `initialize_nc_file`).\n\n`constructor_arguments` methods added for `TripolarGrid` (full reconstruction)\nand `RotatedLatitudeLongitudeGrid` (best-effort: exact for `north_pole=(0,90)`).\nA permissive fallback for other OSSG variants lets writing succeed while\nreserving reconstruction for a follow-up.\n\nSmoke-validated locally:\n- TripolarGrid write produces correct dims and `coordinates` attributes.\n- Non-rotated `RotatedLatitudeLongitudeGrid` produces field values identical to\n  the equivalent `LatitudeLongitudeGrid` and coord arrays matching to roundoff.\n- Rectilinear/LatLon regressions clean.\n\nStill TODO in this PR: time-varying η output for MVD grids; OSSG grid metrics\n(`Δx_**`, `Δy_**`, `Az_**`); FieldTimeSeries round-trip tests for OSSG;\nformal CF `formula_terms` for z-star (deferred to follow-up).\n\nTowards #4332.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* NetCDFWriter: emit OSSG grid metrics (Δx**, Δy**, Az**, Δz)\n\nExtends `gather_grid_metrics` with a dispatch for OrthogonalSphericalShellGrid\nthat emits twelve 2D horizontal metrics — Δx, Δy, Az at each Arakawa-C stagger\nlocation — plus the vertical Δz/Δr. The horizontal metric fields go through the\nstandard output path and pick up the (i_*, j_*) bare dim names and the\n`coordinates` attribute, so they're CF-readable just like data fields.\n\nVertical-spacing dim name now also flows through `vertical_coordinate_name` for\nparity with the coordinate switch in the previous commit (Δr_aac/Δr_aaf for MVD,\nΔz_aac/Δz_aaf for static).\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* NetCDFWriter: OSSG tests, fix grid reconstruction type-name + folded-topo eval\n\nAdds three OSSG-focused testsets to `test/test_netcdf_writer.jl`:\n1. `test_netcdf_tripolar_grid_output` — verifies bare i_*/j_* dims (no coord\n   var on them), all eight λ_**/φ_** 2D aux coords, `coordinates` attribute,\n   and all 12 grid metric fields plus Δz.\n2. `test_netcdf_rotated_llg_matches_llg` — the cross-validation linchpin:\n   a non-rotated `RotatedLatitudeLongitudeGrid` must produce field values\n   identical to the equivalent `LatitudeLongitudeGrid` and coords matching\n   (modulo the 360°-wrap convention).\n3. `test_netcdf_tripolar_grid_reconstruction` — `reconstruct_grid` from a\n   TripolarGrid output file yields a structurally equivalent grid.\n\nTwo reconstruction fixes needed to make the round-trip work:\n\n* `netcdf_string` overrides for `TripolarGrid` and `RotatedLatitudeLongitudeGrid`\n  so the stored type name is the alias (not the base `OrthogonalSphericalShellGrid`);\n  reconstruction then dispatches to the right constructor.\n* Import `RightCenterFolded`/`RightFaceFolded` into the NCDatasets extension so\n  the eval-at-read in `materialize_from_netcdf` can resolve them.\n\nAll 52 assertions across the new testsets pass locally on CPU.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* NetCDFWriter: Δr_* metric names + RectilinearGrid + MVD test\n\nTwo follow-ups:\n1. Vertical spacing variables now name through `vertical_coordinate_name` on\n   `RectilinearGrid` too (LLG and OSSG were already updated). MVD grids emit\n   `Δr_aac`/`Δr_aaf` rather than `Δz_*`.\n2. New `test_netcdf_rectilinear_mvd_output` testset verifying a\n   `RectilinearGrid + MutableVerticalDiscretization` simulation writes the\n   `r_*` vertical names, no `z_*` dims, `Δr_*` metric vars, and field dim\n   signatures end in `r_aac`.\n\n58/58 assertions pass locally on CPU across the OSSG and MVD testsets.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* test: add FieldTimeSeries round-trip test for TripolarGrid\n\n`test_netcdf_tripolar_field_time_series` writes a few snapshots from a\nTripolarGrid simulation, captures the in-memory T at each iteration via a\ncallback aligned with the writer's `IterationInterval(1)`, and then\nreconstructs the file with `FieldTimeSeries(path, name)` and asserts that\n(a) the reconstructed grid is a TripolarGrid of the expected shape, (b) the\ntimes line up, and (c) every snapshot agrees with the corresponding `fts[k]`\ninterior within Float32 roundoff (the writer defaults to `Array{Float32}`).\n\nThis exercises both the new OSSG `constructor_arguments` and the standard\n`set_from_netcdf!` read path for OSSG fields.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* NetCDFWriter: re-validate existing dim sizes in create_field_dimensions!\n\nThe dict-shape refactor of `create_spatial_dimensions!` left a regression in\n`test_netcdf_field_dimension_validation`: when a NetCDF file already has a\ndimension defined with the wrong size and `defVar(ds, \"c\", c)` is called for\na Field whose expected dim size differs, NCDatasets throws `ErrorException`\n(\"dimension … is already defined with the length N. It cannot be redefined\nwith a length of M for the variable c\") instead of the `ArgumentError` the\ntest expects.\n\nRestore the validation: in the \"all dims already exist\" branch of\n`create_field_dimensions!`, compare each dim's current size against the\nfield's interior shape (with reduced/Flat dims masked out) and throw a\ndescriptive `ArgumentError` on mismatch — this works uniformly for\nRectilinear, LatLon, and OSSG fields without needing to zip 2D `λ`/`φ`\narrays against bare 1D dim names.\n\nResolves the 4 failures in `test_netcdf_field_dimension_validation` from\nthe full local regression sweep (3459 / 3463 passing previously).\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* NetCDFWriter: dispatch create_field_coord_variables! by grid type\n\nReplace the conditional in create_field_dimensions! with a dispatched helper\n`_create_field_coord_variables!(ds, fd, grid, …)`.\n\n- RectilinearGrid / LatitudeLongitudeGrid (default 1D-coordinate path): zip the\n  field's dim names with `nodes(fd)` and call `create_spatial_dimensions!` as\n  before, which creates missing coord vars or validates existing ones against\n  the field's nodes. This is what made the original wrong-dim-size test\n  produce an ArgumentError (coord value mismatch), and the path that all\n  existing testsets depended on.\n- OrthogonalSphericalShellGrid: dimensions are bare `i_*`/`j_*` indices that\n  don't correspond positionally to the 2D `λ`/`φ` from `nodes(fd)`, so we\n  skip coord-variable creation here and just verify the named dimensions\n  exist (gather_dimensions must have run at init).\n- ImmersedBoundaryGrid: defers to the underlying grid.\n\nThe previous attempt to do a tuple-vs-tuple `getindex` for filtering broke\ntestsets that exercised `defVar` of fields outside the normal init flow.\nThis dispatch avoids that path entirely for 1D grids while still letting\nOSSG fields share the same `create_field_dimensions!` entry point.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* test: make Tripolar FieldTimeSeries round-trip NaN-tolerant + stable\n\nThe previous test ran 3 iterations with a non-trivial IC, which can produce\nNaN cells on a tiny (12×10×3) tripolar grid before the I/O round-trip is\nchecked. Two adjustments:\n\n- `stop_iteration=1` and a smaller smooth IC `sin(λ)·cos(φ)`. We're testing\n  the round-trip, not the dynamics.\n- NaN-tolerant value comparison: two cells are considered equal if both are\n  NaN or they're approximately equal. This makes the test robust to any\n  halo NaNs that might propagate into the interior on edge cases.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* NetCDFWriter: address review feedback — rename helpers, aliases, drop shim\n\nRound of mechanical cleanups in response to review:\n\n- `effective_dim_names` replaces the awkward `spatial_dim_names_nonempty` in\n  `create_field_dimensions!`, matching the convention already in use elsewhere\n  in `create_spatial_dimensions!`.\n- Drop the `nc_variable` \"backwards compatibility\" shim. It conflated two roles\n  (constructor for the new tuple shape; lift-old-shape pass-through) and the\n  \"backwards compatibility\" label was misleading anyway — this PR introduces\n  both shapes. `create_spatial_dimensions!` now accepts entries that are\n  either an `AbstractArray` (1D coord variable with dim = var_name) or a\n  `NamedTuple(array, dims)` (aux coord variables, e.g. 2D λ/φ on OSSG).\n- Add `Oceananigans.ImmersedBoundaries.underlying_grid(grid)` as a public\n  helper; it returns `grid` for non-immersed grids and `grid.underlying_grid`\n  for an `ImmersedBoundaryGrid`. The NetCDFWriter ext imports and uses it\n  rather than a private `_underlying_grid` shim.\n- Drop underscore prefixes from internal helpers I introduced — those are by\n  convention reserved for kernel-style functions in this codebase. Renames:\n    `_create_field_coord_variables!` → `create_field_coord_variables!`\n    `_add_aux_coordinates_attribute!` → `add_aux_coordinates_attribute!`\n      (consolidated as a multimethod entry + grid-typed methods).\n    `_az_at` → `Az_at_node` (the OSSG 2D-area accessor passed to a\n      `KernelFunctionOperation`).\n    `_underlying_grid` → removed (replaced by `ImmersedBoundaries.underlying_grid`).\n- Introduce short type aliases `OSSG`, `SVD`, `MVD` in\n  `src/OutputWriters/netcdf_writer.jl` for compact dispatch in the\n  `trilocation_location_string` / vertical-name method tables.\n- Merge the Static and Mutable methods of `suffixed_dim_name_generator` and\n  the `Val{:z}` `trilocation_location_string` into one method dispatching on\n  `::AbstractVerticalCoordinate` — they were identical.\n- Inside `gather_vertical_dimensions`, use the literal name (\"z\" for Static,\n  \"r\" for Mutable) — the coordinate type already tells us which one; the\n  `vertical_coordinate_name(coordinate)` call was redundant. The helper is\n  kept for grid-typed callers (field_dimensions, add_aux_coordinates_attribute!)\n  that don't have the coordinate type in hand.\n- Remove the `:reconstruction_unsupported => true` marker from the fallback\n  `constructor_arguments(::OrthogonalSphericalShellGrid)`. It didn't actually\n  signal anything to the read path. Reconstruction failure for OSSG variants\n  without a tailored constructor is now communicated naturally by a\n  `MethodError` from the OSSG constructor (a follow-up will add metrics-based\n  OSSG reconstruction that bypasses the constructor entirely).\n\nSmoke-tested locally: TripolarGrid write still produces the right dims, aux\ncoords, `coordinates` attribute, and all 12 grid metrics.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* NetCDFWriter: metrics-based OrthogonalSphericalShellGrid reconstruction\n\nReconstruct OSSG variants directly from the saved λ/φ/Δx/Δy/Az/z arrays rather\nthan by replaying the user-facing constructor. This generalises reconstruction\nacross all OSSG aliases (TripolarGrid, RotatedLatitudeLongitudeGrid, future\nvariants) with a single code path, and avoids per-alias `constructor_arguments`\nmethods that re-encode parameters the metric arrays already capture.\n\nWhat lands:\n\n- Drop tailored `Grids.constructor_arguments(::TripolarGrid)` and\n  `(::RotatedLatitudeLongitudeGrid)`. The fallback in\n  `OrthogonalSphericalShellGrids.jl` now records arch + FT + size + halo +\n  topology + radius — everything that isn't on the metric arrays themselves.\n\n- Add `conformal_mapping_info(cm)` in `OrthogonalSphericalShellGrids` that\n  flattens a `Tripolar` / `LatitudeLongitudeRotation` into a\n  NetCDF-attribute-friendly `Dict`. Cubed-sphere panel mappings fall through\n  to a stub (recorded by type name only).\n\n- Writer: `write_grid_reconstruction_data!` now also emits a\n  `conformal_mapping` group with those attributes for OSSG grids.\n\n- Reader: `reconstruct_grid` dispatches any `underlying_grid_type <:\n  OrthogonalSphericalShellGrid` to a new `reconstruct_ossg_grid` helper.\n  That helper:\n    * rebuilds the vertical `StaticVerticalDiscretization` from saved\n      `r_aaf`/`z_aaf` face values via `generate_coordinate`;\n    * allocates halo-padded 2D OffsetMatrices via `Oceananigans.Grids.new_data`\n      (imported as `allocate_grid_data` to avoid a name clash with the separate\n      `OutputReaders.new_data`) and copies the interior λ/φ/Δx/Δy/Az data into\n      them — handling both `with_halos=true` and `with_halos=false` files;\n    * rebuilds the `conformal_mapping` (Tripolar / LatitudeLongitudeRotation)\n      from the saved attributes, preserving the type alias so that the\n      reconstructed `TripolarGrid` keeps its `Zipper` boundary-condition\n      dispatch.\n\n- Tests updated: the FTS round-trip and reconstruction tests now pass\n  `include_grid_metrics=true` (required by metrics-based reconstruction;\n  the writer default is `true` already, only the tests had overridden).\n  The `isa TripolarGrid` assertion remains — the conformal mapping round-trip\n  preserves the type alias.\n\nVerified locally on CPU: 70/70 assertions pass across the OSSG and MVD\ntestsets (TripolarGrid output, RotatedLLG vs LLG cross-validation, TripolarGrid\nreconstruction, TripolarGrid FieldTimeSeries roundtrip, Rectilinear+MVD).\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* NetCDFWriter: address PR review — IBG(OSSG) fix, CCSPG support, docs\n\nAddresses several review comments on #5581:\n\n- r3244774627 (`underlying_grid(::Field)` missing): add the actual method —\n  `underlying_grid(field::AbstractField) = underlying_grid(field.grid)` —\n  alongside the grid-typed methods in `ImmersedBoundaries`. `AbstractField` is\n  pulled in via a new `using Oceananigans.Fields: AbstractField` line.\n\n- r3248611797 / r3248846256 (IBG-on-TripolarGrid throws \"missing dimension\n  i_caa\"): in the immersed-boundary reconstruction-data writer we\n  `defVar(ibg_group, \"bottom_height\", field)` against a NetCDF subgroup whose\n  dimension scope is local — the bare `i_*`/`j_*` dims live in the parent\n  dataset and aren't visible. Fix `create_field_coord_variables!` for OSSG to\n  `defDim` any missing bare dim using the field's interior shape; the common\n  init path (where `gather_dimensions` already populated them) becomes a no-op.\n\n- r3244816427 (silent fail on existing 2D aux coords): the existing-variable\n  branch of `create_spatial_dimensions!` only validated 1D coordinate\n  variables, silently accepting any mismatch for 2D aux coords (e.g. λ_cca,\n  φ_cca). Now we validate every existing variable's values against the\n  expected, raising `ArgumentError` on mismatch.\n\n- r3244747500 / r3248686049 (untested grids): add\n  `test_netcdf_tripolar_immersed_output`,\n  `test_netcdf_cubed_sphere_panel_output`,\n  `test_netcdf_cubed_sphere_panel_immersed_output`. All three exercise the\n  end-to-end write path; the tripolar IBG test also round-trips through\n  `FieldTimeSeries` and confirms the reconstructed grid is an\n  `ImmersedBoundaryGrid{<:TripolarGrid}`. The CCSPG reconstruction asserts a\n  generic `OrthogonalSphericalShellGrid` (its `CubedSphereConformalMapping`\n  isn't round-trippable through the conformal-mapping serialization yet — a\n  documented follow-up).\n\n- CCSPG + Δz metrics workaround: `Field(zspacings(grid, Center()))` for a\n  `ConformalCubedSpherePanelGrid` triggers a Julia 1.12 GC segfault during\n  writer init due to the deep 5-parameter `CubedSphereConformalMapping` type\n  signature (horizontal metrics are unaffected). `gather_grid_metrics(::OSSG)`\n  now skips vertical Δz emission for `ConformalCubedSpherePanelGrid` only —\n  TripolarGrid / RotatedLatitudeLongitudeGrid still emit `Δz_aac`/`Δz_aaf`\n  normally. The 1D reference `z_aac`/`z_aaf` coord variables are still\n  written, so vertical spacings remain derivable.\n\n- issue comment 4455292526 (CF §5.2 not documented): expand the `NetCDFWriter`\n  constructor docstring with a new \"OrthogonalSphericalShellGrid\" section\n  describing the CF §5.2 aux-coord convention (logical-index dims + 2D\n  λ/φ aux coords + per-field `coordinates` attribute), linking to the spec.\n\nAll 96 assertions across the OSSG and MVD testsets pass locally on CPU\n(5 prior tests + 3 new = 8 functions).\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* NetCDFWriter: test OSSG + variable-z and OSSG + MVD; refine docstrings\n\nAfter re-bisection the CCSPG `Field(zspacings(grid, …))` segfault under\nJulia 1.12 is **specifically** tied to the deep\n`CubedSphereConformalMapping{Rotation, Fξ, Fη, Cξ, Cη}` type with four nested\n`StepRangeLen{Float64, TwicePrecision{Float64}, …}` parameters; it does not\ntrip for other OSSG combinations. Adds:\n\n- `test_netcdf_tripolar_variable_z_output` — `TripolarGrid` with `z` supplied\n  as a `Vector{Float64}` (so the vertical discretization stores\n  `OffsetVector{Float64, Vector{Float64}}` rather than the uniform\n  `StepRangeLen` case). Verifies horizontal + Δz metrics + reconstruction\n  agree with the input z faces to roundoff.\n- `test_netcdf_tripolar_mvd_output` — `TripolarGrid` wrapped around\n  `MutableVerticalDiscretization`, with `vertical_coordinate=ZStarCoordinate()`.\n  Combines OSSG aux-coord plumbing with the `r`-named reference vertical,\n  the `Δr_*` metric naming, and the Zipper BC dispatch. Asserts the dim\n  signature on `T` is `(i_caa, j_aca, r_aac, time)` and the `coordinates`\n  attribute is `\"λ_cca φ_cca r_aac\"`.\n\nThe CCSPG `Δz` skip in `gather_grid_metrics(::OSSG)` therefore stays narrow\n(`grid isa ConformalCubedSpherePanelGrid` only); Tripolar and\nRotatedLatitudeLongitudeGrid emit `Δz_*` / `Δr_*` metrics normally, and the\ntwo new tests are the regression guard for that.\n\nAlso tightens the `constructor_arguments(::OSSG)` docstring per r3244738532:\nOSSG is the general orthogonal-on-sphere grid; TripolarGrid /\nRotatedLatitudeLongitudeGrid / ConformalCubedSpherePanelGrid are different\n*ways to generate* an OSSG (parameterized by their `conformal_mapping`),\nnot different grid types — NetCDFWriter rebuilds them via the saved\nmetric/coordinate arrays rather than by replaying their generator functions.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* NetCDFWriter: clarify the CCSPG-Δz skip comment\n\nAfter more bisection: `zspacings` and `xspacings` use entirely separate kernel\nfunctions (`Oceananigans.Operators.Δz` vs `Δx`) — neither reads the conformal\nmapping. But `Field(KernelFunctionOperation(F, grid, …))` carries the *full*\ngrid type as a parameter, including `grid.conformal_mapping`. Julia 1.12 has\na pathological specialization of `(F = Δz, grid.conformal_mapping =\nCubedSphereConformalMapping{Nothing, StepRangeLen{…}×4})` that segfaults in\n`gc_mark_outrefs`; the same `Δz` on Tripolar (shallow conformal mapping) is\nfine, and `Δx`/`Δy`/`Az_at_node` on CCSPG are fine.\n\nSo the relationship between `zspacings` and `conformal_mapping` is purely\nthrough Field's type system, not the algorithm. Update the workaround comment\nto reflect this — it's a Julia compile-path bug pinned to a single\n`(kernel, conformal_mapping)` cell, not a semantic issue.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* NetCDFWriter: fix CCSPG-Δz segfault properly — plain Field, no carve-out\n\nAfter deeper debugging (PR #5581 discussion), the segfault is not in\n`gc_mark_outrefs` but in `ijl_types_equal` (`subtype.c`) inside\n`jl_specializations_get_linfo_` — Julia 1.12's method-specialization cache\nchokes on the pairing of:\n\n  * the `Operators.Δz` kernel function (and its `AbstractArray`\n    `getspacing_3d`/Broadcast specialization), and\n  * a grid type carrying `CubedSphereConformalMapping{Nothing,\n    StepRangeLen{Float64, TwicePrecision{Float64}, …}×4}`.\n\nBisection (run-by-hand against the same `Field(KernelFunctionOperation(F, ccspg, …))`\nconstruction):\n\n  | F = Δx, Δy, Az_at_node  →  ✓\n  | F = Δz                  →  segfault\n\nSo `Δz` and the conformal mapping are unrelated semantically — `Δz` only\nreads `grid.z` — but `Field(KernelFunctionOperation(Δz, …))` carries the\nfull grid type as a Field type parameter, and that pairing is what Julia's\ntype system trips on.\n\nThe clean fix is to drop the `KernelFunctionOperation` wrapper for the\nvertical OSSG metric entirely. A plain `Field{Nothing, Nothing, lz}(grid)`\nwith its interior set explicitly from `grid.z.Δᵃᵃᶜ` / `grid.z.Δᵃᵃᶠ` has a\nmuch shorter type signature and compiles fine on every OSSG variant\n(verified for Tripolar, RotatedLatitudeLongitudeGrid, CCSPG).\n\nSo the workaround that special-cased `ConformalCubedSpherePanelGrid`\n(skipping vertical metrics) is removed; CCSPG now emits `Δz_aac`/`Δz_aaf`\n(or `Δr_*` for MVD) just like any other OSSG. Horizontal metrics still go\nthrough `Field(xspacings(...))` etc., which works fine on CCSPG.\n\n`ossg_vertical_spacing_field(grid, lz)` is the new internal helper that\nbuilds the plain Field. It handles both the scalar-Δ (uniform z) and\nvector-Δ (variable z) cases.\n\nTest updated to assert `Δz_aac` and `Δz_aaf` are present in the CCSPG output\nfile. Full OSSG + MVD suite: 111/111 assertions pass locally on CPU\n(8 functions, up from 96 in the previous round due to the now-meaningful\nΔz checks on CCSPG plus the variable-z and MVD tests).\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* NetCDFWriter: unify vertical-metric construction across all grid types\n\nYou called out the architectural smell: vertical spacing lives entirely in\n`grid.z`, so there is no reason `gather_grid_metrics` should have an\nOSSG-specific code path for the vertical Δz/Δr metric — the construction is\nidentical for RectilinearGrid, LatitudeLongitudeGrid, and OSSG.\n\nExtract `add_vertical_metrics!(metrics, grid, dim_name_generator)` and call it\nfrom all three `gather_grid_metrics` dispatches. The helper reads\n`grid.z.Δᵃᵃᶜ` / `grid.z.Δᵃᵃᶠ` directly and stuffs the values into a plain\n`Field((Nothing, Nothing, lz), grid)` rather than wrapping `zspacings(grid, lz)`\nin a `KernelFunctionOperation`. This:\n\n  (a) eliminates the duplicated Δz block in three places, and\n  (b) keeps the Field's type signature shallow enough that the Julia 1.12\n      `(Δz, CubedSphereConformalMapping{…StepRangeLen…})` specialization-cache\n      bug doesn't trip — for *every* grid, not by special-casing CCSPG.\n\nNumerically equivalent to the prior `Field(zspacings(grid, lz))` form for\nevery grid (`grid.z.Δᵃᵃᶜ` is the same storage `zspacings` reads).\n\nAlso drops the now-unused `ossg_vertical_spacing_field` helper introduced in\nthe previous commit — the shared `vertical_spacing_field(grid, lz)` is\ngrid-type-agnostic.\n\n113/113 OSSG + MVD assertions still pass locally on CPU.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* NetCDFWriter: stage vertical metrics through set!\n\n* NetCDFWriter: restore grid reconstruction file\n\n* NetCDFWriter: stage GPU vertical metrics on CPU\n\n* Buildkite: ignore stale docs manifest\n\n* Buildkite: restore pipeline commands\n\n* Update ext/OceananigansNCDatasetsExt/OceananigansNCDatasetsExt.jl\n\nCo-authored-by: Simone Silvestri <silvestri.simone0@gmail.com>\n\n* Address review on OSSG NetCDF reconstruction\n\n- Thread `indices` through `add_vertical_metrics!` / `vertical_spacing_field`\n  so a restricted z range no longer throws DimensionMismatch.\n- Merge the GPU `vertical_spacing_field` into the single CPU definition via\n  `on_architecture(CPU(), Δ)` + `set!`; delete `gpu_vertical_spacing_field.jl`.\n- Pull `OrthogonalSphericalShellGrid` from `Oceananigans.Grids` rather than\n  `Oceananigans.OrthogonalSphericalShellGrids`.\n- Always `fill_halo_regions!` the 2D OSSG metrics on read by wrapping each\n  array as a `Field` on a preliminary grid; the grid's topology gives the\n  correct fold BC for TripolarGrid, so derivatives across the fold no longer\n  NaN even when the file was written without halos.\n- Drop the opaque Julia 1.12 specialization-cache comment above\n  `add_vertical_metrics!`.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Clarify cubed-sphere conformal_mapping fallback comment\n\nThe previous wording (\"losing the panel rotation info\") read like the grid\nitself was missing data. Reword to make explicit that this is a\nmetadata-only loss: the OSSG reconstructs faithfully from its saved metric\nand coordinate arrays and is fully usable; only the type-alias identity\n(e.g. ConformalCubedSpherePanelGrid) is dropped.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* NetCDFWriter: fix GPU set! on vertical metric and CPU dropdims on Nz>1\n\nTwo bugs in the OSSG/MVD reconstruction path, both surfacing when\n`include_grid_metrics=true` (the default on `NetCDFWriter`):\n\n1. `vertical_spacing_field` passed a `reshape(view(::Vector{Float64}, …),\n   (1,1,N))` to `set!`. That type misses `set!(::Field, ::Union{Array,\n   OffsetArray})` and falls into the `u .= v` broadcast fallback — which\n   on GPU launches a kernel with a host `Vector{Float64}` and gets\n   rejected by CUDA for being non-isbits. Materialize the source to a\n   plain 3D `Array` so dispatch hits `set_to_array!` (which handles arch\n   transfer via `copyto!`).\n\n2. `halo_fill_2d_metric` built a `Field{LX, LY, Center}(grid)` (3D, with\n   `Nz + 2Hz` cells in z) and then called `dropdims(data, dims=3)`,\n   which throws \"dropped dims must all be size 1\" the moment Nz > 1.\n   Keep `LZ = Center` (the TripolarGrid fold halo BC dispatches on\n   `Center`), broadcast the 2D metric to every z-level, and return\n   `view(data, :, :, 1)` instead of dropdims.\n\nThe GPU failure was hitting `test_creating_and_appending` (the first\nNetCDFWriter test in the simulation group) and cascading to every other\nGPU NetCDFWriter test path. The CPU failure was the OSSG-reconstruction\ntestset error.\n\nA separate, pre-existing assertion mismatch on `reconstructed.λᶜᶜᵃ` vs\n`grid.λᶜᶜᵃ` at the periodic edge (longitudes wrapping past 360°) is now\nvisible — it was hidden behind the dropdims crash. Tracking separately.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* NetCDFWriter: preserve λ interior across the fold halo-fill\n\n`halo_fill_2d_metric` builds a Field, copies the saved interior in, and\ncalls `fill_halo_regions!`. For TripolarGrid this dispatches to\n`fold_north_center_center_upivot!` (and `_face_center_`), which — after\nfilling the halo proper — also runs a \"redundancy substitution\" on the\n*interior* j=Ny row: the right half is overwritten with the mirrored\nvalue from the left half.\n\nThat substitution is correct for symmetric metrics (Δx, Δy, Az, φ —\nalready equal on both halves) but wrong for λ, where the two halves\ndiffer by 360°. The result was `reconstructed.λᶜᶜᵃ[i, Ny]` coming back\nas `orig - 360` for i > Nx/2, failing the\n`test_netcdf_tripolar_grid_reconstruction` λ assertion (the failure the\nd6b115e57 commit message flagged as \"now visible\").\n\nRestore the interior from the saved data after `fill_halo_regions!`. For\nthe symmetric metrics this is a no-op; for λ it preserves the wrap.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\nCo-authored-by: Simone Silvestri <silvestri.simone0@gmail.com>",
+          "timestamp": "2026-05-21T04:53:52Z",
+          "url": "https://github.com/CliMA/Oceananigans.jl/commit/53d66ef14eac863baf0eeb3f223248fea1e01e2e"
+        },
+        "date": 1779344770264,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Default/tripolar 360x180x50 F64/NVIDIA TITAN V/default",
+            "value": 0.05602148724,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gu_",
+            "value": 2.455521,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gv_",
+            "value": 2.171715,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__rk_substep_turbulent_kinetic_energy_",
+            "value": 1.98866,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_CATKE_closure_fields_",
+            "value": 1.5886145,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.982841,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.979386,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.977786,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_w_from_continuity_",
+            "value": 0.33811,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_TKE_diffusivity_",
+            "value": 0.642588,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_split_explicit_transport_velocities_",
+            "value": 0.484637,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/180x90x50",
+            "value": 0.03521774869,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/720x360x50",
+            "value": 0.21505539137,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F32",
+            "value": 0.046372049879999995,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/nothing",
+            "value": 0.03201080881,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+Biharmonic",
+            "value": 0.0791669319,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+GM+Biharmonic",
+            "value": 0.2590290276,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/nothing+nothing",
+            "value": 0.03719632726,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant5+WENO5",
+            "value": 0.049683307030000005,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant9+WENO9",
+            "value": 0.07501402381,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon_zstar",
+            "value": 0.07011647631,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon_zstar",
+            "value": 0.06083941592,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar_zstar",
+            "value": 0.06254060812,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon",
+            "value": 0.05744931861,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon",
+            "value": 0.05426688302,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/3 tracers",
+            "value": 0.05982063033,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/360x180x50",
+            "value": 0.05602148724,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F64",
+            "value": 0.05602148724,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE",
+            "value": 0.05602148724,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariantDefault+WENO7",
+            "value": 0.05602148724,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar",
+            "value": 0.05602148724,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
+            "value": 0.05602148724,
             "unit": "s/timestep"
           }
         ]
