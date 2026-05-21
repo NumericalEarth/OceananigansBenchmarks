@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1779369683573,
+  "lastUpdate": 1779375003825,
   "repoUrl": "https://github.com/CliMA/Oceananigans.jl",
   "entries": {
     "Oceananigans.jl Benchmarks": [
@@ -15651,6 +15651,188 @@ window.BENCHMARK_DATA = {
           {
             "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
             "value": 0.055909442489999996,
+            "unit": "s/timestep"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Tomás Chor",
+            "username": "tomchor",
+            "email": "tomaschor@gmail.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "c2c4d1fa3eb12c322173df4246798924223b8a71",
+          "message": "Fix broken LagrangianAveraged DynamicSmagorinsky regression tests (#5506)\n\n* Fix broken LagrangianAveraged DynamicSmagorinsky regression tests\n\nTwo bugs prevented the regression test from exercising the Lagrangian-\naveraged dynamic Smagorinsky closure at all:\n\n1. Duplicate nested `for` loop in `test_nonhydrostatic_regression.jl`\n   caused the inner loop to shadow the outer one, running each closure\n   16 times instead of 4 (with no effect on correctness, since the\n   inner variable always won).\n\n2. `ocean_large_eddy_simulation_regression_test.jl` restores model\n   state via direct `.=` assignment rather than `set!`, so\n   `initialize_closure_fields!` was never called with the loaded\n   velocities. For LagrangianAveraging this left 𝒥ᴹᴹ = 0, which\n   permanently disables the closure (ϵ = 0 → 𝒥ᴹᴹ never accumulates).\n   Now calls `initialize_closure_fields!` after state is loaded so the\n   closure is properly bootstrapped from the checkpoint velocities.\n\nNote: the LagrangianDynamicSmagorinsky regression test will correctly\nfail until reference data is regenerated with the fixed code.\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\n\n* comment out tests we're not testing\n\n* better fix\n\n* Restore previous_compute_time Ref for bit-exact LagAvg DynamicSmag regression\n\nThe regression test loader previously only restored `Field`-typed leaves\nin `model.closure_fields`, skipping the `previous_compute_time::RefValue`\nscalar. After `set!(model, ...)`, that Ref was left at `clock.time = 0`\n(because `model.clock.time` is updated only later). At the first time\nstep from the loaded checkpoint, `Δt_lagrangian = clock.time - 0` was\ncatastrophically large, making `ϵ ≈ 1` in `_lagrangian_average_LM_MM!`\nand effectively discarding the carefully-restored 𝒥 history.\n\nExtends the closure-restoration loop to also copy `Base.RefValue` leaves,\nso `previous_compute_time` is set to the value from the checkpoint. With\nthis, the LagrangianAveragedDynamicSmagorinsky regression test reproduces\nthe reference iteration to machine epsilon (~1e-15) over 10 time steps.\n\nAlso:\n- Auto-detect new (`simulation/model/...`) vs legacy (root) checkpoint\n  paths in `get_fields_from_checkpoint`.\n- Add `load_interior(data, target_size)` helper that auto-detects how\n  many halo layers are saved and unwraps OffsetArrays — removes the\n  brittle hardcoded `[2:end-1, 2:end-1, 2:end-1]` slicing.\n- Return `closure_fields` (and `pNHS`, harmlessly) from\n  `get_fields_from_checkpoint`.\n- Fix the regression-data-generation block (which had a stale\n  `simulation.stop_iteration = ...` referring to a `simulation` that\n  was never constructed) so it can be uncommented to regenerate\n  reference data.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* force redownload of the data if the files have changed sizes\n\n* make it work on GPU\n\n* uncomment temporarily commented out regions\n\n* remove unnused function\n\n* Make rayleigh_benard regression's get_fields_from_checkpoint destructure explicit\n\n`get_fields_from_checkpoint` now returns 5 values (`solution, Gⁿ, G⁻,\nclosure_fields, pNHS`). Rayleigh-Bénard only needs the first three;\nJulia's destructuring iterates and silently discards extras, so the\nold `solution, Gⁿ, G⁻ = get_fields_from_checkpoint(...)` works, but\nit's not self-documenting. Bind the unused values to `_` so the call\nsite explicitly shows that two extras are being ignored.\n\nAddresses Copilot review comment on #5506.\n\n---------\n\nCo-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>\nCo-authored-by: Gregory L. Wagner <wagner.greg@gmail.com>",
+          "timestamp": "2026-05-21T11:21:05Z",
+          "url": "https://github.com/CliMA/Oceananigans.jl/commit/c2c4d1fa3eb12c322173df4246798924223b8a71"
+        },
+        "date": 1779375003405,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Default/tripolar 360x180x50 F64/NVIDIA TITAN V/default",
+            "value": 0.05581277498000001,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gu_",
+            "value": 2.454128,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gv_",
+            "value": 2.1704665,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__rk_substep_turbulent_kinetic_energy_",
+            "value": 1.989619,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_CATKE_closure_fields_",
+            "value": 1.5898455,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.984186,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.979482,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.978458,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_w_from_continuity_",
+            "value": 0.33843,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_TKE_diffusivity_",
+            "value": 0.64102,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_split_explicit_transport_velocities_",
+            "value": 0.486749,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/180x90x50",
+            "value": 0.02803249144,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/720x360x50",
+            "value": 0.21504798588,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F32",
+            "value": 0.04444261189,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/nothing",
+            "value": 0.032036530019999995,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+Biharmonic",
+            "value": 0.0792038549,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+GM+Biharmonic",
+            "value": 0.25924446659,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/nothing+nothing",
+            "value": 0.037232253480000005,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant5+WENO5",
+            "value": 0.04966387676,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant9+WENO9",
+            "value": 0.07539347771,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon_zstar",
+            "value": 0.07012206282,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon_zstar",
+            "value": 0.0608516864,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar_zstar",
+            "value": 0.06254559209,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon",
+            "value": 0.05743132243,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon",
+            "value": 0.05443074985,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/3 tracers",
+            "value": 0.059978797,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/360x180x50",
+            "value": 0.05581277498000001,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F64",
+            "value": 0.05581277498000001,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE",
+            "value": 0.05581277498000001,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariantDefault+WENO7",
+            "value": 0.05581277498000001,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar",
+            "value": 0.05581277498000001,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
+            "value": 0.05581277498000001,
             "unit": "s/timestep"
           }
         ]
