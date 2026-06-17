@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1781677071939,
+  "lastUpdate": 1781734306962,
   "repoUrl": "https://github.com/CliMA/Oceananigans.jl",
   "entries": {
     "Oceananigans.jl Benchmarks": [
@@ -21839,6 +21839,188 @@ window.BENCHMARK_DATA = {
           {
             "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
             "value": 0.056074082670000004,
+            "unit": "s/timestep"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Gregory L. Wagner",
+            "username": "glwagner",
+            "email": "wagner.greg@gmail.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "8b2334b99da0b70359ebb0046e04631a20d8e3f9",
+          "message": "Add `quadmesh!` for flat-shaded curvilinear-grid plotting (#5688)\n\n* Add `quadmesh!` for flat-shaded curvilinear-grid plotting\n\n`heatmap!(ax, f)` draws on a rectangular mesh that ignores grid geometry, so a\nvertical slice of a terrain-following field (or a spherical-grid panel) shows\nflat layers — the curvature is invisible (#5651). `quadmesh!` fills that gap:\neach cell is drawn as a quadrilateral from its four explicit corner coordinates\nand filled with a single flat color (cf. matplotlib `pcolormesh`), so fields on\ncurvilinear meshes render in their true geometry.\n\n  - `quadmesh!(ax, xc, yc, vals)` and `quadmesh!(ax, xc, yc, zc, vals)` (3D, for\n    Axis3): corner matrices are (P+1, Q+1), cell values (P, Q). `vals` may be an\n    Observable (animations update only the color); `drop_nan_cells` omits NaN\n    cells. Returns the Mesh plot so `Colorbar(fig, plt)` works.\n  - `quadmesh(...)` non-mutating variant returns (figure, axis, plot).\n\nImplementation: 4 duplicated vertices + 2 triangles per quad, with the cell value\nrepeated across its 4 vertices and passed as the `color` kwarg — equal corner\ncolors degenerate Gouraud shading to a flat fill, the one path that renders\nidentically across backends (CairoMakie has no per-face color path).\n\nStubs are declared in the main package and methods added in OceananigansMakieExt,\nso `using Oceananigans` (+ a Makie backend) surfaces `quadmesh!`. Adds a headless\ntest covering 2D/3D meshes, color-buffer length, Colorbar, NaN dropping, the\nObservable path, and corner-size validation.\n\nFollow-ups (noted in #5651): `Field`/`FieldTimeSeries` methods that derive\ncorners from the grid (terrain-following znode + spherical), and a `@recipe`.\n\nCo-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>\n\n* quadmesh!: add `quadmesh!(ax, f::Field)` deriving corners from the grid\n\nThe primary user-facing entry: pass a Field and the cell-corner coordinates are\nderived from its grid — no manual coordinate bookkeeping. A horizontal field on a\nLatitudeLongitudeGrid / OrthogonalSphericalShellGrid is drawn as a 3D Cartesian\nshell (Axis3); any other 2D field (one reduced or Flat dimension) is a 2D slice\nin its two active coordinates, with the vertical built from the scalar `znode` so\nterrain-following coordinates keep their true curvature. `quadmesh(f)` is the\nnon-mutating variant. The corner-array methods remain for fully manual control.\n\nTests cover the rectilinear x–z field, the spherical-shell field, the 3D-field\nerror, and the non-mutating variant.\n\nCo-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>\n\n* quadmesh!: grid wireframe, spherical-corner fix, tidy up\n\n- Add `quadmesh!(ax, grid)`: draw the grid itself as a wireframe (cell edges, no\n  fill) from the same corner coordinates. Spherical grids → 3D shell graticule;\n  a grid with one Flat dimension → 2D wireframe.\n- Fix spherical corner extraction: the interior `λnodes(grid, Face(), Face())` is\n  only (Nx, Ny), so the closing boundary corner was missing and naive padding left\n  a seam/gap. Index the halo'd Face-Face nodes over 1:P+1, 1:Q+1 instead — the\n  (P+1)-th corner wraps to the first and the periodic seam closes cleanly.\n- Drop `_`-prefixed helper names to match the extension's style; unify the 2D/3D\n  vertex builders into one (`Point{D,Float32}`); trim comments/docstrings.\n\nTests: 23/23 (corner-array, Field, grid-wireframe).\n\nCo-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>\n\n* quadmesh!: support ImmersedBoundaryGrid, drop unused SphericalGrid alias\n\nAdd `spherical_corners(::ImmersedBoundaryGrid, ...)` delegating to the\nunderlying grid so `quadmesh!` works on immersed-boundary grids. Remove the\nunused `const SphericalGrid` union. Ignore `sandbox/` scratch MWEs.\n\nCo-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Opus 4.8 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-06-17T20:34:09Z",
+          "url": "https://github.com/CliMA/Oceananigans.jl/commit/8b2334b99da0b70359ebb0046e04631a20d8e3f9"
+        },
+        "date": 1781734306483,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Default/tripolar 360x180x50 F64/NVIDIA TITAN V/default",
+            "value": 0.05594087657,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gu_",
+            "value": 2.431763,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gv_",
+            "value": 2.338515,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__rk_substep_turbulent_kinetic_energy_",
+            "value": 2.010389,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_CATKE_closure_fields_",
+            "value": 1.484279,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.996827,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.991034,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.989434,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_w_from_continuity_",
+            "value": 0.320414,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_TKE_diffusivity_",
+            "value": 0.636252,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_split_explicit_transport_velocities_",
+            "value": 0.483421,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/180x90x50",
+            "value": 0.030475841620000003,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/720x360x50",
+            "value": 0.21529635259,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F32",
+            "value": 0.045481207499999995,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/nothing",
+            "value": 0.03240318004,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+Biharmonic",
+            "value": 0.08169626034000001,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+GM+Biharmonic",
+            "value": 0.26133038842,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/nothing+nothing",
+            "value": 0.03700317589,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant5+WENO5",
+            "value": 0.05024320122,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant9+WENO9",
+            "value": 0.07491069886,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon_zstar",
+            "value": 0.06945531167,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon_zstar",
+            "value": 0.06490879782,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar_zstar",
+            "value": 0.06287279996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon",
+            "value": 0.057251101789999995,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon",
+            "value": 0.05759664522999999,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/3 tracers",
+            "value": 0.06012856818,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/360x180x50",
+            "value": 0.05594087657,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F64",
+            "value": 0.05594087657,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE",
+            "value": 0.05594087657,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariantDefault+WENO7",
+            "value": 0.05594087657,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar",
+            "value": 0.05594087657,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
+            "value": 0.05594087657,
             "unit": "s/timestep"
           }
         ]
