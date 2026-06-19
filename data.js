@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1781875946583,
+  "lastUpdate": 1781886595812,
   "repoUrl": "https://github.com/CliMA/Oceananigans.jl",
   "entries": {
     "Oceananigans.jl Benchmarks": [
@@ -23113,6 +23113,188 @@ window.BENCHMARK_DATA = {
           {
             "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
             "value": 0.056512681579999995,
+            "unit": "s/timestep"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Gregory L. Wagner",
+            "username": "glwagner",
+            "email": "wagner.greg@gmail.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "ade2d88c538dd3be534629c01da959aebec7f65b",
+          "message": "Add LambertConformalConicGrid (#5589)\n\n* Add LambertConformalConicGrid\n\nA new regional curvilinear grid built on OrthogonalSphericalShellGrid using\na Lambert conformal conic projection. Three domain modes (x/y, center/extent,\ncenter/spacing), one or two standard parallels, false easting/northing, and\nan apex-in-domain warning for safe regional use.\n\n- src/OrthogonalSphericalShellGrids/lambert_conformal_conic_grid.jl: projection,\n  GPU kernels for coordinates and spherical metrics, and the curvilinear-grid\n  contract (with_halo, similar, with_number_type, constructor_arguments,\n  Adapt, on_architecture).\n- ext/OceananigansNCDatasetsExt: projected x/y dimensions, geodesic metric\n  fields, halo-aware gather_grid_metrics, and free-surface displacement\n  detection by data identity rather than output name.\n- src/Models/output_attributes.jl: OrthogonalSphericalShellGrid u/v attribute\n  fallback labelled \"local x/y direction\".\n- Tests cover projection math (incl. allocation-free inference), constructor\n  validation, coordinates/metrics, Float32, with_halo, NetCDFWriter metadata\n  (reductions, slicing, halos, multi-grid), GPU transfer, and a hydrostatic\n  smoke run. test/run_lambert_conformal_conic_gpu_gate.jl wires the GPU\n  subset into CI.\n\nAlso drops a stray CosineRampMask export that referenced no definition.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Add rotated-pole splash example, refresh polar turbulence validation\n\n- examples/rotated_pole_splash.jl: new Literate example showing a small\n  hydrostatic free-surface splash near the geographic North Pole on a\n  RotatedLatitudeLongitudeGrid; wired into docs/make.jl.\n- validation/orthogonal_spherical_shell_grid/polar_turbulence.jl: rewrite the\n  script as a runnable validation. Adds CPU arch, seeded initial condition,\n  smaller default grid, OCEANANIGANS_VALIDATE_STOP_ITERATION smoke mode, and\n  an optional OCEANANIGANS_VALIDATE_MOVIE branch that pulls in GLMakie only\n  when requested.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Drop NCDatasets integration from LambertConformalConicGrid PR\n\nDefer the NetCDF/LCC integration to a follow-up: revert the\nOceananigansNCDatasetsExt and Models/output_attributes additions to main,\nremove the NetCDFWriter testsets and the write_grid_reconstruction_data! /\nreconstruct_grid calls from the LCC tests, and drop the LCC NetCDF\nreconstruction calls from test_grid_reconstruction.jl. The in-memory\nconstructor_arguments-based reconstruction tests (incl. flat-LCC) remain.\n\n901/901 LCC tests pass on CPU.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Drop strict @allocated == 0 assertion on LCC GPU kernel launch\n\nKernelAbstractions launches on CUDA typically allocate small amounts for\nkernel-arg staging and stream metadata, so requiring exactly zero bytes is\nbrittle and was the likely cause of the gpu-unit-tests failure. The kernel\ncorrectness is still covered by the surrounding direct/transfer roundtrip\ncomparisons against the CPU reference.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Relax LCC GPU-vs-CPU metric_tolerance\n\nFloat32 spherical_quadrilateral_area on Metal/CUDA accumulates FMA and\ntranscendental-implementation differences of up to ~2e-3 relative against the\nhost (worst case: Az corner halo, where atan + dot/cross of unit vectors stack\nnon-associative rounding). The 1e-5 rtol was hard-failing all 12 metric\ndirect-construction comparisons plus 12 with_halo comparisons on the GPU\nrunner — exactly the 24 failures in gpu-unit-tests.\n\nMeasured locally on Metal:\n  Δx: rtol up to 6e-5\n  Δy: rtol up to 1.7e-4\n  Az: rtol up to 1.9e-3   (the binding constraint)\n\nSet Float32 to 5e-3 (2.6× the observed worst case) and defensively relax\nFloat64 to 1e-10. Transferred-roundtrip comparisons are still effectively\nexact (on_architecture is a pure data copy).\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Drop unrelated rotated-pole splash example\n\nThe example uses RotatedLatitudeLongitudeGrid, not LambertConformalConicGrid,\nso it doesn't demonstrate the grid this PR introduces. Removing it and its\ntwo docs/make.jl entries; the polar use of LCC is still covered by\nvalidation/orthogonal_spherical_shell_grid/lcc_polar_hydrostatic_splash.jl.\nA proper LCC-on-the-pole example (polar vortex crystal, à la Siegelman et al.\n2022) will land in a follow-up PR.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Fix rotation_angle to use 2-arg atan (atan2)\n\nSingle-argument atan(sinθ / cosθ) returns in (-π/2, π/2] and silently\nsign-flips the rotation for cells whose true angle falls in the 2nd or\n3rd quadrant. This was invisible on grids whose rotation angle stays\nbounded (tripolar, midlatitude rotated lat-lon) but is exposed on a\npolar-centred LambertConformalConicGrid, where the rotation angle wraps\nthe full (-π, π] as we go around the apex.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Support polar-stereographic limit (standard_parallel = ±90°)\n\nLambert conformal conic with the cone tangent at a pole degenerates to\npolar stereographic. The LCC formulas have a removable singularity there:\ncos(φ₁) → 0 and T₁^n → ∞, with cos(φ₁)·T₁^n / n → 2·sign(n). Taking that\nlimit directly when |φ₁| = π/2 lets `LambertConformalConicGrid(...;\nstandard_parallel = 90, latitude_of_origin = 90, ...)` produce a clean\npolar stereographic grid (n = 1, F = 2) — no missing wedge, monotonic λ\nacross the antemeridian, no zig-zag at the seam.\n\n`validate_lcc_angles` now allows ±π/2 but requires both standard parallels\nto coincide with the same pole when either is at one. The mid-latitude\nparallels-symmetric-about-equator check is preserved when neither parallel\nis at a pole.\n\nAlso points `validation/orthogonal_spherical_shell_grid/lcc_polar_hydrostatic_splash.jl`\nat the polar limit so the polar splash actually runs on the right\nprojection.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Add polar vortex crystal example + polar-stereographic tests + docstring\n\n- examples/polar_vortex_crystal.jl: a Literate example that builds a\n  pole-centred LambertConformalConicGrid with standard_parallel=90 (polar\n  stereographic limit), encloses it in a 1500-km circular bowl via\n  ImmersedBoundaryGrid, and runs a 5-day single-layer barotropic shallow\n  water simulation of 6 cyclones + 1 central cyclone in approximate\n  geostrophic balance — the polar-vortex-crystal regime of\n  Siegelman, Young & Ingersoll 2022. Animates η, ζ, and |u|.\n- docs/make.jl: register the new example for Literate processing.\n- docs/oceananigans.bib: Siegelman, Young & Ingersoll 2022 PNAS reference.\n- test/test_lambert_conformal_conic_grid.jl: new \"polar stereographic limit\"\n  testset checking n = ±1, F = ±2, polar pole-centred grids construct\n  cleanly with finite coordinates and metrics, both standard_parallel=±90\n  and standard_parallels=(±90, ±90) forms work, and that mixing one polar\n  with one non-polar parallel — or opposite poles — is rejected.\n- LambertConformalConicGrid docstring: new \"Polar stereographic limit\"\n  section documenting the standard_parallel=±90 trigger and the underlying\n  wedge mathematics.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Fix polar vortex crystal title alignment\n\nLabel(fig[0, :], ...) is ambiguous when later cells in row 0 are unused.\nSpan the title explicitly across columns 1:6 (3 heatmaps × 2 cells each\nfor axis + colorbar) so the title centres over the figure.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Title Label: tellwidth=false so it doesn't squeeze the panels\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Simplify polar vortex example + expand polar-grid test coverage\n\n- examples/polar_vortex_crystal.jl\n  - Use SplitExplicitFreeSurface (with cfl from gravity-wave CFL via\n    fixed_Δt) and WENOVectorInvariant momentum advection.\n  - Bump halo to (7, 7, 7) for WENO + IBG.\n  - Run for 30 days at Δt = 10 minutes (outer step bounded by advective\n    CFL, not gravity waves which the split-explicit substeps handle).\n  - Replace the great-circle/bearing helpers with direct\n    projected-coordinate geostrophic balance via lcc_forward, using\n    `set!(...; intrinsic_velocities=true)`. Cleaner because the polar\n    stereographic limit (n=1) has no wedge so lcc_forward is bijective.\n  - Trim progress printing to every 1000 iterations.\n- test/test_lambert_conformal_conic_grid.jl\n  - rotation_angle on a polar-centred LCC grid spans the full (-π, π]\n    range (catches the single-arg atan regression).\n  - intrinsic ↔ extrinsic vector roundtrip on a polar grid.\n  - with_halo / similar / with_number_type / constructor_arguments\n    preserve n = 1, F = 2.\n  - Polar HFSM smoke test: 3-iteration run with SplitExplicitFreeSurface,\n    asserting finite velocities and free surface displacement.\n  - Total LCC testset now 1009/1009 on CPU.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Polar vortex example: Δt=20min + AdvectiveCFL in progress\n\nPushed Δt from 10 min to 20 min after measuring CFL ≈ 0.19 with the new\nAdvectiveCFL diagnostic in the progress callback. 30-day wall time on CPU\ndropped from ~5 min to ~1.8 min. Tried Δt=25-40 min: each NaN'd before\nday 30 despite advective CFL < 0.4 — the practical limit at this\nconfiguration isn't strictly CFL.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Polar vortex example: 60-day run, 12-hour snapshots, Field-direct heatmaps\n\n- stop_time 30 → 60 days at the same Δt=20 min (≈1.7 min wall time);\n  saved every 12 hours instead of every hour → ~120 frames instead of 720\n  for a much less monotonous movie and a 12× smaller jld2.\n- Animation passes the FieldTimeSeries[n] result directly to heatmap! via\n  the Oceananigans Makie extension instead of going through\n  Array(interior(..., :, :, 1)).\n- Tried Δt=25/30/40 min with various split-explicit cfl settings (0.3 to\n  0.7) — all NaN before day 30, so 20 min is the practical limit at this\n  configuration. The advective CFL diagnostic stays at ~0.19 the whole\n  run; the limit isn't strictly CFL.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Plot interior slices, not Fields, in the polar vortex example\n\nheatmap! of a Field on LCC + ImmersedBoundaryGrid through OceananigansMakieExt\nproduces 2D x,y coordinate matrices that Makie's CellGrid heatmap can't\ningest (it wants 1D vectors), erroring out at adjust_axes during doc build.\nRevert the animation to Array(interior(..., :, :, 1)). Sim path unchanged.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Fix Field-direct heatmap on OSSG; polar vortex example 120 days\n\next/OceananigansMakieExt.jl\n  Two issues with `convert_field_argument` for Fields on\n  OrthogonalSphericalShellGrid (and ImmersedBoundaryGrid wrappings thereof):\n\n  (1) The type alias `OSSGField = Field{..., <:OrthogonalSphericalShellGrid}`\n      did not match `Field{..., <:ImmersedBoundaryGrid{..., <:OSSG}}`, so a\n      field on `LambertConformalConicGrid + ImmersedBoundaryGrid` fell back\n      to the generic two-axis path that returns 2D coordinate matrices —\n      which Makie's CellGrid heatmap can't ingest. Widen the alias to also\n      accept IBG-wrapped OSSGs.\n\n  (2) `convert_field_argument(::OSSGField) = make_plottable_array(f)`\n      returned a bare matrix, but the caller splats with `...`, which\n      iterates the matrix as a sequence of scalars. Wrap in a 1-tuple so\n      the matrix is passed as a single argument.\n\n  Together these let `heatmap!(ax, field)` work on Fields whose grid is\n  any OSSG variant (TripolarGrid, RotatedLatitudeLongitudeGrid,\n  LambertConformalConicGrid, ConformalCubedSpherePanelGrid, including\n  immersed-boundary wrappings).\n\nexamples/polar_vortex_crystal.jl\n  Run 60 → 120 days (still ~2 min CPU at Δt = 20 min). The animation now\n  passes the FieldTimeSeries[n] result directly to heatmap! via the fixed\n  Makie extension, no Array(interior(...)) shuffling.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Apply suggestion from @glwagner\n\n* Simplify validation checks in lambert_conformal_conic_grid\n\n* Rename LambertConformalConic projection constants to verbose names\n\nn → cone_constant, F → scale_constant, ρ₀ → origin_radius\n\nInline projection kernels bind short math-notation locals from the verbose\nfields so the formulas stay readable.\n\nCo-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>\n\n* Fix validate_lcc_scalar positivity check broken by simplification\n\nThe collapsed one-liner 'positive && value > 0 || throw' parses as\n'(positive && value > 0) || throw' since && binds tighter than ||, so it\nthrew for every scalar validated with the default positive=false — making\ncentral_longitude (and any negative-allowed scalar) always fail. Only throw\nwhen a positive value is required and the value is non-positive.\n\nCo-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>\n\n* Guard rotation_angle against zero Δx; silence apex warning on grid reconstruction\n\n- rotation_angle: the Rsinθ terms divided by Δxᶜᶠᶜ with no zero-guard, unlike\n  the Rcosθ terms, producing NaN at a cell sitting exactly on the cone apex /\n  pole (reachable on polar-centred LCC grids). Guard each term with ifelse,\n  mirroring the Rcosθ pattern. Shared with TripolarGrid; vector-rotation tests\n  pass (186/186).\n- LambertConformalConicGrid: the apex/pole @warn re-fired on every with_halo /\n  similar / with_number_type because each re-runs the constructor. Add a warn\n  keyword (default true) and pass warn=false from the reconstruction paths; the\n  nonfinite-domain error still always throws.\n\nCo-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>\n\n* Remove leftover LCC GPU gate runner\n\ntest/run_lambert_conformal_conic_gpu_gate.jl was a standalone manual runner\nnot wired into any CI config or runtests.jl. The LCC tests already run through\nthe normal harness (runtests.jl), which CI executes on CPU and GPU.\n\nCo-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>\n\n* Make lcc_scale_factor exact at the pole\n\nThe direct form k = n ρ / (radius cos φ) evaluates 0/0 at the pole and returned\n~2 instead of 1 for a polar-stereographic (tangent-at-pole) map. Using the exact\nidentity cos φ = 2T/(1+T²) with T = tan(π/4+φ/2), the cos φ cancels, giving a\nclosed form that stays well-conditioned at the pole and is bit-identical to the\nold form elsewhere. Add north/south pole assertions.\n\nCo-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>\n\n* Apply suggestions from code review\n\nCo-authored-by: Simone Silvestri <silvestri.simone0@gmail.com>\n\n* Update Aqua ambiguity cap 321 -> 317\n\nMerging main resolved 4 method ambiguities (count includes recursive deps).\nThe exact-equality assertion turned that improvement into a failure; update the\ncap per the test's own instructions ('When ambiguities are resolved, update the\ncap accordingly').\n\nCo-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>\n\n* Make Aqua ambiguity check a cap (<= 321) instead of exact equality\n\nThe exact-equality assertion is brittle: the ambiguity count includes recursive\ndependencies, so it varies across environments/dependency versions and broke CI\neven after updating the pinned number. Use the maintainers' original ceiling\n(321) as a cap, which still catches any increase in ambiguities while tolerating\ndependency-driven decreases.\n\nCo-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\nCo-authored-by: Mosè Giordano <765740+giordano@users.noreply.github.com>\nCo-authored-by: Simone Silvestri <silvestri.simone0@gmail.com>",
+          "timestamp": "2026-06-19T14:55:24Z",
+          "url": "https://github.com/CliMA/Oceananigans.jl/commit/ade2d88c538dd3be534629c01da959aebec7f65b"
+        },
+        "date": 1781886595306,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Default/tripolar 360x180x50 F64/NVIDIA TITAN V/default",
+            "value": 0.055970218249999995,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gu_",
+            "value": 2.431553,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gv_",
+            "value": 2.338129,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__rk_substep_turbulent_kinetic_energy_",
+            "value": 2.010196,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_CATKE_closure_fields_",
+            "value": 1.484263,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.996378,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.990682,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.989146,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_w_from_continuity_",
+            "value": 0.320926,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_TKE_diffusivity_",
+            "value": 0.636348,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_split_explicit_transport_velocities_",
+            "value": 0.483485,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/180x90x50",
+            "value": 0.03353902363,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/720x360x50",
+            "value": 0.21528719838000002,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F32",
+            "value": 0.04359786649,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/nothing",
+            "value": 0.03228996911,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+Biharmonic",
+            "value": 0.08150802936,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+GM+Biharmonic",
+            "value": 0.26003654989,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/nothing+nothing",
+            "value": 0.03692800362,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant5+WENO5",
+            "value": 0.050235140420000005,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant9+WENO9",
+            "value": 0.07490700822,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon_zstar",
+            "value": 0.06945975774,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon_zstar",
+            "value": 0.06513604869,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar_zstar",
+            "value": 0.06287215844,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon",
+            "value": 0.05720121368,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon",
+            "value": 0.05761148136,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/3 tracers",
+            "value": 0.060039111480000004,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/360x180x50",
+            "value": 0.055970218249999995,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F64",
+            "value": 0.055970218249999995,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE",
+            "value": 0.055970218249999995,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariantDefault+WENO7",
+            "value": 0.055970218249999995,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar",
+            "value": 0.055970218249999995,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
+            "value": 0.055970218249999995,
             "unit": "s/timestep"
           }
         ]
