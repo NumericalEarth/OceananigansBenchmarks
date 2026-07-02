@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1782952599874,
+  "lastUpdate": 1782972714818,
   "repoUrl": "https://github.com/CliMA/Oceananigans.jl",
   "entries": {
     "Oceananigans.jl Benchmarks": [
@@ -29483,6 +29483,188 @@ window.BENCHMARK_DATA = {
           {
             "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
             "value": 0.05601691693,
+            "unit": "s/timestep"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Gregory L. Wagner",
+            "username": "glwagner",
+            "email": "wagner.greg@gmail.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "c84268c8b0c876c6bc6bf2ef859ab327522d1c85",
+          "message": "Simplify Relaxation: drop ContinuousForcing dependency, add transform and Field targets (#5620)\n\n* Simplify Relaxation: drop ContinuousForcing dependency, add transform and Field targets\n\nEliminates the two parallel materialize paths Relaxation had after #5575\n(Number/function → ContinuousForcing wrap, FTS → bespoke FieldTimeSeriesTarget\nwith type-parameter-as-index trick). Now a single Relaxation{R,M,T,F,L,Tr}\ncarries the forced field directly, with one kernel and one evaluate_target\ndispatch family covering Number, function, AbstractField, and FieldTimeSeries\ntargets.\n\n- src/OutputReaders/field_time_series.jl: GPUAdaptedFieldTimeSeries now\n  carries its grid (was dropped to Nothing before), so the kernel can call\n  interpolate(X, t, fts, loc, fts.grid) post-adapt without any wrapper.\n- src/Forcings/relaxation.jl: rewrite around a 6-param Relaxation; delete\n  FieldTimeSeriesTarget, the type-parameter index trick, and 6 continuous-form\n  callable overloads that only existed to feed ContinuousForcing.\n- Add `transform` kwarg: `transform = :horizontal_average` or any\n  `f -> Field(...)` closure builds a lazy target from the forced field,\n  refreshed each step via the new compute_forcing! hook.\n- Add `FieldRelaxation` and `FieldTimeSeriesRelaxation` aliases for tests and\n  user-side type assertions.\n- src/Forcings/compute_forcing.jl: new compute_forcing! hook (default no-op,\n  Tuple/NamedTuple/MultipleForcings recursion, Relaxation method that\n  compute!'s a transformed target).\n- Wire compute_forcing!(model.forcing) into update_state! for\n  Nonhydrostatic, HydrostaticFreeSurface, and ShallowWater models.\n\nTests: 1215/1215 Forcings pass on CPU (incl. new Field-target and\ntransform=:horizontal_average testsets — analytical decay matches exp(-t/τ)\nto 8 decimal places, confirming compute_forcing! fires each step).\n11540/11540 OutputReaders pass, confirming the GPUAdaptedFTS grid addition\nis non-breaking.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Shorten distributed tripolar simulation correctness check to 30 steps\n\nrun_distributed_simulation in test/distributed_tests_utils.jl drives the\nserial-vs-distributed correctness checks in test_mpi_tripolar.jl by running\n100 time steps of a HydrostaticFreeSurfaceModel with SplitExplicitFreeSurface\n(20 substeps) on a 40x40 tripolar grid, then comparing serial and distributed\nfinal states. This runs four times per fold topology (serial reference + slab\n+ pencil + large-pencil) for each of two fold topologies, dominating the\n~90-minute Distributed MPI Tripolar Grid CI job.\n\nThese are partition-equivalence checks, not stability checks. Boundary\nexchanges and the fold are exercised every step, so 30 steps is enough to\ncatch any mismatch in the slab/pencil halo plumbing without buying long-term\nintegration time we are not testing.\n\n(Pushed onto #5620 per request despite scope mismatch with the Relaxation\nrefactor; intent is to ship it on whichever PR merges first.)\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Update src/Forcings/relaxation.jl\n\nCo-authored-by: Eliot Quon <eliot@aeolus.earth>\n\n* Refine Relaxation: transform-as-relaxed-field, interpolated Field targets\n\n- `transform` now produces the *quantity being damped* (the kernel LHS), and\n  the user-supplied `target` is the RHS the transform is pulled toward. The\n  tendency becomes `rate * mask * (target(X, t) - transform(c)[i, j, k])`,\n  so `transform = :horizontal_average, target = c_target` nudges only the\n  horizontal mean toward `c_target` while leaving fluctuations alone.\n  `materialize_forcing` stores the lazy `transform(field)` in `r.field`, and\n  `compute_forcing!(r)` refreshes it via `compute!(r.field)`.\n\n- `evaluate_target` learns to interpolate `AbstractField` targets whose grid\n  or location differs from the forced field's. `materialize_target` wraps\n  such targets in a new `InterpolatedFieldTarget` that carries `loc` and\n  `grid` separately so `Adapt`ing through the kernel doesn't lose the\n  metadata that `interpolate(X, field, loc, grid)` needs. Same-grid +\n  same-location (or reduced) Field targets stay unwrapped on the\n  direct-indexing fast path.\n\n- Right-align the `show` properties at the colon (`├──   rate`,\n  `├──   mask`, `└── target`) and surface `transform` when set.\n\n* Update Relaxation tests for new transform + Field-interp semantics\n\n- Drop the `@test_throws ArgumentError` cases for location- and\n  grid-mismatched Field targets; assert they auto-wrap in\n  `InterpolatedFieldTarget` and that a uniform target still drives the\n  tracer to `c_ref` after one step.\n- Cover the new `transform`-relaxes-field semantics: with\n  `transform = :horizontal_average, target = c_target` the horizontal\n  mean follows `<c>(t) = c_target (1 - exp(-t/τ))` while fluctuations\n  are preserved; also test a `LinearTarget{:z}` profile and the closure\n  form.\n\n* Document Relaxation transform: relaxing a reduction toward a target\n\nAdd a \"Relaxing a reduction of the field toward a target\" section explaining\nthe new `transform` semantics: `transform` produces the lazy reduction that\nis damped, the user-supplied `target` is the RHS, and the tendency is\n`rate * mask * (target - transform(c)[i, j, k])`. Two jldoctests cover the\n`:horizontal_average` shortcut (with a `LinearTarget{:z}` profile) and a\ncustom `xz`-averaging callable.\n\n* Show `location` and `transform` in Relaxation `show`/`summary`\n\nRefactor the Relaxation `show` and `summary` methods to print any\nnon-`nothing` extras after `target`, with the tree connectors\n(`├──`/`└──`) derived from position. Currently `location` and\n`transform` both qualify, and the sponge-layer doctests in\n`forcing_functions.md` are updated to include the new `location` line.\n\n* Rename `Relaxation.field` → `relaxed`; widen kernel dispatch to `F<:AbstractArray`\n\n* Rename the field that holds the kernel LHS from `field` to `relaxed` (it\n  is the forced field when `transform === nothing`, otherwise the lazy\n  `transform(forced_field)`). All references in `relaxation.jl`,\n  `compute_forcing.jl`, `test_forcings.jl`, and the docstring/docs follow.\n\n* Widen the kernel callable's dispatch constraint from `F<:AbstractField`\n  to `F<:AbstractArray`. `Adapt.adapt_structure(to, f::Field) = adapt(to,\n  f.data)` strips the wrapping `Field` on the device, so `r.relaxed`\n  arrives at the GPU kernel as an `OffsetArray{…, CuDeviceArray}` —\n  triggering `MethodError`/`InvalidIRError` in\n  `gpu_compute_Gu!`/`gpu_compute_Gc!` for every Relaxation testset under\n  `time_stepping_2`. Both `Field` and `OffsetArray` are `<:AbstractArray`,\n  so the relaxed bound matches pre- and post-`Adapt`.\n\n* Rework `show`/`summary`: render `Relaxation{$FT}` for a freshly-\n  constructed Relaxation and `Relaxation{$FT, $LX, $LY, $LZ}` once\n  materialized; surface the `relaxed` field via `prettysummary` and\n  `transform` when set. Doctests in `relaxation.jl` and the sponge-layer\n  examples in `forcing_functions.md` are updated to match.\n\n* Revert GPUAdaptedFieldTimeSeries grid plumbing; cache grid on FieldTimeSeriesTarget\n\nThe previous approach added a `grid::G` field on `GPUAdaptedFieldTimeSeries`\nso the relaxation kernel could call `interpolate(X, Time(t), fts, loc, fts.grid)`\non the device. That changed the GPU-adapted FTS from `AbstractField{...,Nothing,...}`\nto `AbstractField{...,G,...}`, which is invasive for code that expects FTS to\nhave no grid on the GPU.\n\nInstead, introduce a lean `FieldTimeSeriesTarget{F, G}` wrapper that holds the\nFTS together with its grid (cached at materialize time so it survives Adapt).\n`materialize_forcing` now wraps `forcing.target` in this struct for the FTS\npath, and `evaluate_target(::FieldTimeSeriesTarget, ...)` reads the grid from\nthe wrapper.\n\n- Revert `GPUAdaptedFieldTimeSeries` to its original 8-param form\n- Add `FieldTimeSeriesTarget` with `Adapt.adapt_structure` and `summary`\n- Widen `FieldTimeSeriesRelaxation` alias to match both `FlavorOfFTS` and\n  `FieldTimeSeriesTarget` so it covers pre- and post-materialization\n- Update FTS testset: `rm.target` is now a `FieldTimeSeriesTarget`, so\n  assert `rm.target.field_time_series === fts` and `rm.target.grid === fts.grid`;\n  drop the now-disjoint `rm isa FieldRelaxation` assertion\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Reorder Relaxation type params; show as `Relaxation{FT} at (LX, LY, LZ)`\n\nType parameters reordered from `{R, M, T, F, L, Tr}` to `{R, F, M, T, L, Tr}`\nso the kernel-dispatch parameter (`F<:AbstractArray` for the `relaxed`\nquantity) sits second. The struct field order and `Adapt.adapt_structure`\nfollow suit. Show output now mirrors Field's style: `Relaxation{FT}` for\nfreshly-constructed forcings and `Relaxation{FT} at (LX, LY, LZ)` once\nmaterialized, with `show_location` reused from Fields and properties\nright-aligned under the header. The `relaxed` property is placed second,\nright after `rate`, matching its new type-parameter position.\n\n- Simplify aliases: `FieldRelaxation = Relaxation{<:Any, <:Any, <:Any, <:AbstractField}`\n  (and `FieldTimeSeriesRelaxation` likewise) — no need to bind every\n  type variable explicitly when only the constraint matters\n- Left-align `FieldTimeSeriesTarget`'s `grid` field\n- Update jldoctest expected output in `relaxation.jl` and the three\n  sponge-layer doctests in `forcing_functions.md`\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Refresh stale doctest expected output in NetCDFWriter and BoundaryConditionOperation\n\nThree doctests were comparing against outputs that drifted with library\nupdates: two NetCDF file-size strings (32.8→32.7 KiB and 34.4→34.3 KiB)\nand a floating-point reduction mean (1.0842e-19→0.0) where the new\nreduction order yields exact zero. Updated the expected text to match\nthe current evaluated output so `Documenter.doctest` is green.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Relaxation FTS target: require horizontal bracketing only (vertical clamps)\n\n`validate_fts_target_extent` no longer requires the FieldTimeSeries target to bracket the model grid\nvertically. A target may not span the model's full column — e.g. a limited-area child nested in ERA5\npressure-level data, whose lowest level sits above the child's near-surface cells. On a clamping\nvertical (a geopotential-height PressureLevelGrid) the interpolation clamps to the target's edge value\nrather than reading unfilled halos, so the vertical check was spuriously rejecting valid nested setups.\nHorizontal bracketing is still required (a too-small horizontal target region is a genuine error).\n\n* Fix CI failures: stale imports, device-side transform, platform-dependent doctests\n\n- Remove stale explicit imports `TYPEDEF` and `znodes` from relaxation.jl\n  (failed ExplicitImports check in cpu/gpu unit tests)\n- Drop `transform` from the Adapt'ed Relaxation: it is host-side only\n  (`compute_forcing!`, `show`) and a `Symbol` transform is not isbits,\n  which fails CUDA kernel argument conversion (gpu time_stepping_2)\n- Restore main's doctest outputs in netcdf_writer.jl and\n  boundary_condition_operation.jl: `mean=...` and file sizes are\n  platform-dependent (ARM local vs x64 CI) and CI reproduces main's values\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01G2H4iuZwvmwyxJtPKu4Myj\n\n---------\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\nCo-authored-by: Eliot Quon <eliot@aeolus.earth>",
+          "timestamp": "2026-07-02T04:52:39Z",
+          "url": "https://github.com/CliMA/Oceananigans.jl/commit/c84268c8b0c876c6bc6bf2ef859ab327522d1c85"
+        },
+        "date": 1782972714303,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Default/tripolar 360x180x50 F64/NVIDIA TITAN V/default",
+            "value": 0.05590467219,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gu_",
+            "value": 2.436947,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gv_",
+            "value": 2.345987,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__rk_substep_turbulent_kinetic_energy_",
+            "value": 2.006325,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_CATKE_closure_fields_",
+            "value": 1.4617515,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.997851,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.99241,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.992123,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_w_from_continuity_",
+            "value": 0.318686,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_TKE_diffusivity_",
+            "value": 0.628604,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_split_explicit_transport_velocities_",
+            "value": 0.470749,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/180x90x50",
+            "value": 0.01704827536,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/720x360x50",
+            "value": 0.2153062617,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F32",
+            "value": 0.04391322582,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/nothing",
+            "value": 0.032340361899999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+Biharmonic",
+            "value": 0.0816424654,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+GM+Biharmonic",
+            "value": 0.25375110208,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/nothing+nothing",
+            "value": 0.03681475786,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant5+WENO5",
+            "value": 0.05013827022,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant9+WENO9",
+            "value": 0.07496538017,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon_zstar",
+            "value": 0.06948226152,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon_zstar",
+            "value": 0.06483223398,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar_zstar",
+            "value": 0.06277550172,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon",
+            "value": 0.057424804409999995,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon",
+            "value": 0.05761641959,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/3 tracers",
+            "value": 0.060059956559999995,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/360x180x50",
+            "value": 0.05590467219,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F64",
+            "value": 0.05590467219,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE",
+            "value": 0.05590467219,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariantDefault+WENO7",
+            "value": 0.05590467219,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar",
+            "value": 0.05590467219,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
+            "value": 0.05590467219,
             "unit": "s/timestep"
           }
         ]
