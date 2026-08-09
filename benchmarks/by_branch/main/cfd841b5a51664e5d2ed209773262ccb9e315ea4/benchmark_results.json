@@ -10,10 +10,10 @@
     ],
     "time_steps": 100,
     "Δt": 60,
-    "total_time_seconds": 5.591343004,
-    "time_per_step_seconds": 0.055913430039999996,
-    "steps_per_second": 17.884790814740008,
-    "grid_points_per_second": 57946722.23975763,
+    "total_time_seconds": 5.591091246,
+    "time_per_step_seconds": 0.055910912460000003,
+    "steps_per_second": 17.885596138596803,
+    "grid_points_per_second": 57949331.489053644,
     "gpu_memory_used": 1051775796,
     "metadata": {
       "julia_version": "1.12.2",
@@ -24,98 +24,98 @@
       "cpu_model": "Intel(R) Xeon(R) Silver 4214 CPU @ 2.20GHz (cascadelake)",
       "num_threads": 8,
       "hostname": "tartarus",
-      "timestamp": "2026-08-09T03:15:48.007"
+      "timestamp": "2026-08-09T05:35:03.135"
     },
     "nsys_top_kernels": [
       {
         "name": "gpu_compute_hydrostatic_free_surface_Gu_(CompilerMetadata<DynamicSize",
-        "total_time_ns": 777206001,
+        "total_time_ns": 775858565,
         "instances": 318,
-        "avg_time_ns": 2444044,
-        "med_time_ns": 2433552.5,
-        "min_time_ns": 2424529,
-        "max_time_ns": 2654159
+        "avg_time_ns": 2439806.8,
+        "med_time_ns": 2433377,
+        "min_time_ns": 2425393,
+        "max_time_ns": 2659472
       },
       {
         "name": "gpu_compute_hydrostatic_free_surface_Gv_(CompilerMetadata<DynamicSize",
-        "total_time_ns": 749119995,
+        "total_time_ns": 747877446,
         "instances": 318,
-        "avg_time_ns": 2355723.3,
-        "med_time_ns": 2345905,
-        "min_time_ns": 2338449,
-        "max_time_ns": 2550991
+        "avg_time_ns": 2351815.9,
+        "med_time_ns": 2345874,
+        "min_time_ns": 2336210,
+        "max_time_ns": 2551057
       },
       {
         "name": "gpu__rk_substep_turbulent_kinetic_energy_(CompilerMetadata<DynamicSize",
-        "total_time_ns": 635091461,
+        "total_time_ns": 634303988,
         "instances": 315,
-        "avg_time_ns": 2016163.4,
-        "med_time_ns": 2008947,
-        "min_time_ns": 2004211,
-        "max_time_ns": 2196594
+        "avg_time_ns": 2013663.5,
+        "med_time_ns": 2008884,
+        "min_time_ns": 2004180,
+        "max_time_ns": 2191603
       },
       {
         "name": "gpu_compute_CATKE_closure_fields_(CompilerMetadata<OffsetStaticSize<_0_361__0_181__1_50_>",
-        "total_time_ns": 466574031,
+        "total_time_ns": 465988087,
         "instances": 318,
-        "avg_time_ns": 1467213.9,
-        "med_time_ns": 1461702.5,
-        "min_time_ns": 1454774,
-        "max_time_ns": 1597622
+        "avg_time_ns": 1465371.3,
+        "med_time_ns": 1461736,
+        "min_time_ns": 1454615,
+        "max_time_ns": 1592023
       },
       {
         "name": "gpu_compute_hydrostatic_free_surface_Gc_(CompilerMetadata<DynamicSize",
-        "total_time_ns": 315993783,
+        "total_time_ns": 315515104,
         "instances": 315,
-        "avg_time_ns": 1003154.9,
-        "med_time_ns": 999161,
-        "min_time_ns": 994106,
-        "max_time_ns": 1095865
+        "avg_time_ns": 1001635.3,
+        "med_time_ns": 999322,
+        "min_time_ns": 994394,
+        "max_time_ns": 1091482
       },
       {
         "name": "gpu_compute_hydrostatic_free_surface_Gc_(CompilerMetadata<DynamicSize",
-        "total_time_ns": 314273145,
+        "total_time_ns": 313680264,
         "instances": 315,
-        "avg_time_ns": 997692.5,
-        "med_time_ns": 993658,
-        "min_time_ns": 989306,
-        "max_time_ns": 1090265
+        "avg_time_ns": 995810.4,
+        "med_time_ns": 993434,
+        "min_time_ns": 988954,
+        "max_time_ns": 1087642
       },
       {
         "name": "gpu_compute_hydrostatic_free_surface_Gc_(CompilerMetadata<DynamicSize",
-        "total_time_ns": 314025442,
+        "total_time_ns": 313357763,
         "instances": 315,
-        "avg_time_ns": 996906.2,
-        "med_time_ns": 992953,
-        "min_time_ns": 988058,
-        "max_time_ns": 1089305
+        "avg_time_ns": 994786.5,
+        "med_time_ns": 992538,
+        "min_time_ns": 988474,
+        "max_time_ns": 1085786
       },
       {
         "name": "gpu__compute_w_from_continuity_(CompilerMetadata<OffsetStaticSize<__5_366___5_186_>",
-        "total_time_ns": 202839880,
+        "total_time_ns": 202876826,
         "instances": 633,
-        "avg_time_ns": 320442.1,
-        "med_time_ns": 320510,
-        "min_time_ns": 306334,
-        "max_time_ns": 337182
+        "avg_time_ns": 320500.5,
+        "med_time_ns": 320798,
+        "min_time_ns": 307071,
+        "max_time_ns": 336990
       },
       {
         "name": "gpu_compute_TKE_diffusivity_(CompilerMetadata<DynamicSize",
-        "total_time_ns": 199314418,
+        "total_time_ns": 199057327,
         "instances": 315,
-        "avg_time_ns": 632744.2,
-        "med_time_ns": 630779,
-        "min_time_ns": 625660,
-        "max_time_ns": 682140
+        "avg_time_ns": 631928,
+        "med_time_ns": 630812,
+        "min_time_ns": 623580,
+        "max_time_ns": 681563
       },
       {
         "name": "gpu__compute_split_explicit_transport_velocities_(CompilerMetadata<OffsetStaticSize<__5_366___5_186___5_56_>",
-        "total_time_ns": 152445624,
+        "total_time_ns": 152403655,
         "instances": 315,
-        "avg_time_ns": 483954.4,
-        "med_time_ns": 483773,
-        "min_time_ns": 473725,
-        "max_time_ns": 493244
+        "avg_time_ns": 483821.1,
+        "med_time_ns": 483389,
+        "min_time_ns": 472893,
+        "max_time_ns": 493757
       }
     ]
   },
@@ -130,10 +130,10 @@
     ],
     "time_steps": 100,
     "Δt": 60,
-    "total_time_seconds": 1.697519298,
-    "time_per_step_seconds": 0.01697519298,
-    "steps_per_second": 58.909492291380126,
-    "grid_points_per_second": 47716688.75601789,
+    "total_time_seconds": 1.681062502,
+    "time_per_step_seconds": 0.01681062502,
+    "steps_per_second": 59.48618797993984,
+    "grid_points_per_second": 48183812.26375127,
     "gpu_memory_used": 289250458,
     "metadata": {
       "julia_version": "1.12.2",
@@ -144,7 +144,7 @@
       "cpu_model": "Intel(R) Xeon(R) Silver 4214 CPU @ 2.20GHz (cascadelake)",
       "num_threads": 8,
       "hostname": "tartarus",
-      "timestamp": "2026-08-09T03:28:41.631"
+      "timestamp": "2026-08-09T05:48:18.563"
     }
   },
   {
@@ -158,10 +158,10 @@
     ],
     "time_steps": 100,
     "Δt": 60,
-    "total_time_seconds": 21.532632354,
-    "time_per_step_seconds": 0.21532632354,
-    "steps_per_second": 4.644114029162047,
-    "grid_points_per_second": 60187717.81794013,
+    "total_time_seconds": 21.544829935,
+    "time_per_step_seconds": 0.21544829934999998,
+    "steps_per_second": 4.641484769278593,
+    "grid_points_per_second": 60153642.60985057,
     "gpu_memory_used": 3983861996,
     "metadata": {
       "julia_version": "1.12.2",
@@ -172,7 +172,7 @@
       "cpu_model": "Intel(R) Xeon(R) Silver 4214 CPU @ 2.20GHz (cascadelake)",
       "num_threads": 8,
       "hostname": "tartarus",
-      "timestamp": "2026-08-09T03:32:25.647"
+      "timestamp": "2026-08-09T05:52:16.935"
     }
   },
   {
@@ -186,10 +186,10 @@
     ],
     "time_steps": 100,
     "Δt": 60,
-    "total_time_seconds": 4.382694455,
-    "time_per_step_seconds": 0.043826944550000003,
-    "steps_per_second": 22.817013831734247,
-    "grid_points_per_second": 73927124.81481896,
+    "total_time_seconds": 4.365663964,
+    "time_per_step_seconds": 0.04365663964,
+    "steps_per_second": 22.906023190198976,
+    "grid_points_per_second": 74215515.13624468,
     "gpu_memory_used": 536549684,
     "metadata": {
       "julia_version": "1.12.2",
@@ -200,7 +200,7 @@
       "cpu_model": "Intel(R) Xeon(R) Silver 4214 CPU @ 2.20GHz (cascadelake)",
       "num_threads": 8,
       "hostname": "tartarus",
-      "timestamp": "2026-08-09T03:45:05.823"
+      "timestamp": "2026-08-09T06:05:28.631"
     }
   },
   {
@@ -214,10 +214,10 @@
     ],
     "time_steps": 100,
     "Δt": 60,
-    "total_time_seconds": 3.228008676,
-    "time_per_step_seconds": 0.03228008676,
-    "steps_per_second": 30.978851061799315,
-    "grid_points_per_second": 100371477.44022977,
+    "total_time_seconds": 3.232633045,
+    "time_per_step_seconds": 0.03232633045,
+    "steps_per_second": 30.934534977507784,
+    "grid_points_per_second": 100227893.32712522,
     "gpu_memory_used": 689195956,
     "metadata": {
       "julia_version": "1.12.2",
@@ -228,7 +228,7 @@
       "cpu_model": "Intel(R) Xeon(R) Silver 4214 CPU @ 2.20GHz (cascadelake)",
       "num_threads": 8,
       "hostname": "tartarus",
-      "timestamp": "2026-08-09T03:56:21.931"
+      "timestamp": "2026-08-09T06:16:31.463"
     }
   },
   {
@@ -242,10 +242,10 @@
     ],
     "time_steps": 100,
     "Δt": 60,
-    "total_time_seconds": 8.151459485,
-    "time_per_step_seconds": 0.08151459485,
-    "steps_per_second": 12.267741768699963,
-    "grid_points_per_second": 39747483.330587886,
+    "total_time_seconds": 8.151026866,
+    "time_per_step_seconds": 0.08151026866000001,
+    "steps_per_second": 12.268392883984392,
+    "grid_points_per_second": 39749592.944109425,
     "gpu_memory_used": 1051775796,
     "metadata": {
       "julia_version": "1.12.2",
@@ -256,7 +256,7 @@
       "cpu_model": "Intel(R) Xeon(R) Silver 4214 CPU @ 2.20GHz (cascadelake)",
       "num_threads": 8,
       "hostname": "tartarus",
-      "timestamp": "2026-08-09T04:00:07.811"
+      "timestamp": "2026-08-09T06:20:17.419"
     }
   },
   {
@@ -270,10 +270,10 @@
     ],
     "time_steps": 100,
     "Δt": 60,
-    "total_time_seconds": 25.400716065,
-    "time_per_step_seconds": 0.25400716065,
-    "steps_per_second": 3.936896886847666,
-    "grid_points_per_second": 12755545.913386438,
+    "total_time_seconds": 25.385279905,
+    "time_per_step_seconds": 0.25385279905,
+    "steps_per_second": 3.939290816340518,
+    "grid_points_per_second": 12763302.244943278,
     "gpu_memory_used": 1089504916,
     "metadata": {
       "julia_version": "1.12.2",
@@ -284,7 +284,7 @@
       "cpu_model": "Intel(R) Xeon(R) Silver 4214 CPU @ 2.20GHz (cascadelake)",
       "num_threads": 8,
       "hostname": "tartarus",
-      "timestamp": "2026-08-09T04:05:37.283"
+      "timestamp": "2026-08-09T06:25:40.051"
     }
   },
   {
@@ -298,10 +298,10 @@
     ],
     "time_steps": 100,
     "Δt": 60,
-    "total_time_seconds": 3.681412209,
-    "time_per_step_seconds": 0.03681412209,
-    "steps_per_second": 27.163488988146614,
-    "grid_points_per_second": 88009704.32159503,
+    "total_time_seconds": 3.684554303,
+    "time_per_step_seconds": 0.036845543030000004,
+    "steps_per_second": 27.140324657063413,
+    "grid_points_per_second": 87934651.88888545,
     "gpu_memory_used": 1051775796,
     "metadata": {
       "julia_version": "1.12.2",
@@ -312,7 +312,7 @@
       "cpu_model": "Intel(R) Xeon(R) Silver 4214 CPU @ 2.20GHz (cascadelake)",
       "num_threads": 8,
       "hostname": "tartarus",
-      "timestamp": "2026-08-09T03:14:57.223"
+      "timestamp": "2026-08-09T05:34:38.827"
     }
   },
   {
@@ -326,10 +326,10 @@
     ],
     "time_steps": 100,
     "Δt": 60,
-    "total_time_seconds": 5.015656158,
-    "time_per_step_seconds": 0.050156561579999995,
-    "steps_per_second": 19.937570848133088,
-    "grid_points_per_second": 64597729.54795121,
+    "total_time_seconds": 5.013792185,
+    "time_per_step_seconds": 0.050137921849999996,
+    "steps_per_second": 19.944983020870858,
+    "grid_points_per_second": 64621744.98762158,
     "gpu_memory_used": 1051775796,
     "metadata": {
       "julia_version": "1.12.2",
@@ -340,7 +340,7 @@
       "cpu_model": "Intel(R) Xeon(R) Silver 4214 CPU @ 2.20GHz (cascadelake)",
       "num_threads": 8,
       "hostname": "tartarus",
-      "timestamp": "2026-08-09T03:16:54.603"
+      "timestamp": "2026-08-09T05:36:38.419"
     }
   },
   {
@@ -354,10 +354,10 @@
     ],
     "time_steps": 100,
     "Δt": 60,
-    "total_time_seconds": 7.497869826,
-    "time_per_step_seconds": 0.07497869825999999,
-    "steps_per_second": 13.337121385227954,
-    "grid_points_per_second": 43212273.288138576,
+    "total_time_seconds": 7.497072132,
+    "time_per_step_seconds": 0.07497072132,
+    "steps_per_second": 13.338540464772468,
+    "grid_points_per_second": 43216871.1058628,
     "gpu_memory_used": 1051775796,
     "metadata": {
       "julia_version": "1.12.2",
@@ -368,7 +368,7 @@
       "cpu_model": "Intel(R) Xeon(R) Silver 4214 CPU @ 2.20GHz (cascadelake)",
       "num_threads": 8,
       "hostname": "tartarus",
-      "timestamp": "2026-08-09T03:19:31.799"
+      "timestamp": "2026-08-09T05:39:17.595"
     }
   },
   {
@@ -382,10 +382,10 @@
     ],
     "time_steps": 100,
     "Δt": 60,
-    "total_time_seconds": 6.953453962,
-    "time_per_step_seconds": 0.06953453962,
-    "steps_per_second": 14.38134207064446,
-    "grid_points_per_second": 46595548.30888805,
+    "total_time_seconds": 6.955411612,
+    "time_per_step_seconds": 0.06955411612,
+    "steps_per_second": 14.377294339773144,
+    "grid_points_per_second": 46582433.66086499,
     "gpu_memory_used": 1007869984,
     "metadata": {
       "julia_version": "1.12.2",
@@ -396,7 +396,7 @@
       "cpu_model": "Intel(R) Xeon(R) Silver 4214 CPU @ 2.20GHz (cascadelake)",
       "num_threads": 8,
       "hostname": "tartarus",
-      "timestamp": "2026-08-09T03:29:09.215"
+      "timestamp": "2026-08-09T05:49:31.187"
     }
   },
   {
@@ -410,10 +410,10 @@
     ],
     "time_steps": 100,
     "Δt": 60,
-    "total_time_seconds": 6.488312193,
-    "time_per_step_seconds": 0.06488312193,
-    "steps_per_second": 15.412328665055037,
-    "grid_points_per_second": 49935944.874778315,
+    "total_time_seconds": 6.48988635,
+    "time_per_step_seconds": 0.0648988635,
+    "steps_per_second": 15.408590321462254,
+    "grid_points_per_second": 49923832.6415377,
     "gpu_memory_used": 1019807928,
     "metadata": {
       "julia_version": "1.12.2",
@@ -424,7 +424,7 @@
       "cpu_model": "Intel(R) Xeon(R) Silver 4214 CPU @ 2.20GHz (cascadelake)",
       "num_threads": 8,
       "hostname": "tartarus",
-      "timestamp": "2026-08-09T03:32:29.083"
+      "timestamp": "2026-08-09T05:52:51.535"
     }
   },
   {
@@ -438,10 +438,10 @@
     ],
     "time_steps": 100,
     "Δt": 60,
-    "total_time_seconds": 6.278253911,
-    "time_per_step_seconds": 0.06278253911000001,
-    "steps_per_second": 15.927995493267968,
-    "grid_points_per_second": 51606705.39818821,
+    "total_time_seconds": 6.27964211,
+    "time_per_step_seconds": 0.0627964211,
+    "steps_per_second": 15.92447439651939,
+    "grid_points_per_second": 51595297.044722825,
     "gpu_memory_used": 1060572276,
     "metadata": {
       "julia_version": "1.12.2",
@@ -452,7 +452,7 @@
       "cpu_model": "Intel(R) Xeon(R) Silver 4214 CPU @ 2.20GHz (cascadelake)",
       "num_threads": 8,
       "hostname": "tartarus",
-      "timestamp": "2026-08-09T03:37:16.431"
+      "timestamp": "2026-08-09T05:57:41.159"
     }
   },
   {
@@ -466,10 +466,10 @@
     ],
     "time_steps": 100,
     "Δt": 60,
-    "total_time_seconds": 5.762949829,
-    "time_per_step_seconds": 0.05762949829,
-    "steps_per_second": 17.35222463620722,
-    "grid_points_per_second": 56221207.82131141,
+    "total_time_seconds": 5.729005467,
+    "time_per_step_seconds": 0.05729005467000001,
+    "steps_per_second": 17.455036581133708,
+    "grid_points_per_second": 56554318.52287321,
     "gpu_memory_used": 1003800864,
     "metadata": {
       "julia_version": "1.12.2",
@@ -480,7 +480,7 @@
       "cpu_model": "Intel(R) Xeon(R) Silver 4214 CPU @ 2.20GHz (cascadelake)",
       "num_threads": 8,
       "hostname": "tartarus",
-      "timestamp": "2026-08-09T03:46:33.007"
+      "timestamp": "2026-08-09T06:07:07.715"
     }
   },
   {
@@ -494,10 +494,10 @@
     ],
     "time_steps": 100,
     "Δt": 60,
-    "total_time_seconds": 5.760341789,
-    "time_per_step_seconds": 0.05760341789,
-    "steps_per_second": 17.36008099223572,
-    "grid_points_per_second": 56246662.41484373,
+    "total_time_seconds": 5.760885443,
+    "time_per_step_seconds": 0.05760885443,
+    "steps_per_second": 17.358442723680454,
+    "grid_points_per_second": 56241354.42472467,
     "gpu_memory_used": 1015738808,
     "metadata": {
       "julia_version": "1.12.2",
@@ -508,7 +508,7 @@
       "cpu_model": "Intel(R) Xeon(R) Silver 4214 CPU @ 2.20GHz (cascadelake)",
       "num_threads": 8,
       "hostname": "tartarus",
-      "timestamp": "2026-08-09T03:49:27.975"
+      "timestamp": "2026-08-09T06:10:00.023"
     }
   },
   {
@@ -522,10 +522,10 @@
     ],
     "time_steps": 100,
     "Δt": 60,
-    "total_time_seconds": 6.004745397,
-    "time_per_step_seconds": 0.06004745397,
-    "steps_per_second": 16.65349542546142,
-    "grid_points_per_second": 53957325.17849499,
+    "total_time_seconds": 6.006336217,
+    "time_per_step_seconds": 0.06006336217,
+    "steps_per_second": 16.649084631154274,
+    "grid_points_per_second": 53943034.20493984,
     "gpu_memory_used": 1163221812,
     "metadata": {
       "julia_version": "1.12.2",
@@ -536,7 +536,7 @@
       "cpu_model": "Intel(R) Xeon(R) Silver 4214 CPU @ 2.20GHz (cascadelake)",
       "num_threads": 8,
       "hostname": "tartarus",
-      "timestamp": "2026-08-09T04:02:37.947"
+      "timestamp": "2026-08-09T06:22:53.827"
     }
   }
 ]
