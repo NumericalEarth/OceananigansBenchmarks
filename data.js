@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1787129256629,
+  "lastUpdate": 1787184542804,
   "repoUrl": "https://github.com/CliMA/Oceananigans.jl",
   "entries": {
     "Oceananigans.jl Benchmarks": [
@@ -43133,6 +43133,188 @@ window.BENCHMARK_DATA = {
           {
             "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
             "value": 0.06697811647,
+            "unit": "s/timestep"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Mosè Giordano",
+            "username": "giordano",
+            "email": "765740+giordano@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "ac0d28ba900ef9a436622da87beabc74e226ff32",
+          "message": "Read Field boundary conditions windowed to a plane at their own plane (#5881)\n\n* Read Field boundary conditions windowed to a plane at their own plane\n\nAn array-valued boundary condition is evaluated as `condition[i, j, 1]`, which is\nright for a plain 2D array and for a `Field` reduced along the boundary-normal\ndirection, but not for a `Field` windowed to a boundary plane with `indices`,\ne.g. `GradientBoundaryCondition(Field(-g * ρ, indices = (:, :, grid.Nz)))`:\nsuch a field stores its data offset to the window (its k-axis is `Nz:Nz`), so\n`[i, j, 1]` silently reads out of bounds under `@inbounds` (and throws a\n`BoundsError` with `--check-bounds=yes`). Nothing validated array-valued\nconditions either.\n\nFields windowed to a single plane in one direction are now read at their own\nplane, in `getbc` methods dispatching on the `Field`'s indices type parameter,\nfor the x, y and z boundaries. Their location and window are preserved when\nthey are adapted for kernels, as is already done for reduced fields, so that\nthese methods also dispatch on the GPU. `regularize_boundary_condition` now\nrejects a `Field` windowed to more than one plane, or windowed along a\ntangential direction, with an `ArgumentError`. Reduced fields and plain arrays\nbehave as before.\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\n\n* Preserve the window of plane fields only when adapting boundary conditions\n\nThe previous commit preserved the location and the window of every `Field`\nwindowed to a single plane when adapting it for kernels, so that the plane\n`getbc` methods dispatch on the GPU. That is too broad: the free surface\ndisplacement of a `HydrostaticFreeSurfaceModel` is a `ZFaceField` windowed to\n`Nz + 1`, so it stopped adapting to its bare data like the other model fields,\nthe tuple of model fields became heterogeneous, and indexing it at runtime with\nthe field-dependency indices of a `ContinuousForcing` needed a dynamic call\n(`ijl_get_nth_field_checked`) that cannot be compiled for the GPU:\n\n    InvalidIRError: compiling gpu_compute_hydrostatic_free_surface_Gc! ...\n    Reason: unsupported call to an unknown function (call to ijl_get_nth_field_checked)\n      [2] field_arguments @ src/Utils/user_function_arguments.jl:1\n      [3] user_function_arguments @ src/Utils/user_function_arguments.jl:26\n\nas in the \"hydrostatic continuous/discrete forcing consistency\" test on the GPU.\n\nAdapt the wrapper-preserving way only the condition of a `BoundaryCondition`,\nwhich is the only place where the plane `getbc` methods are needed, and leave\nplane fields adapting to their bare data everywhere else. Test both behaviours.\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\n\n* Remove redundant comments\n\n* Test that tangentially windowed Field boundary conditions are rejected\n\nAlso when the field is windowed to a single plane, or reduced, along the\nboundary-normal direction: checking that direction alone is not enough, since\nthe tangential indices of the boundary index the condition directly, and a\nfield windowed along them would be read outside its window.\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\n\n* Compact the validation loop of Field boundary conditions\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\n\n* Window Field boundary conditions to the boundary plane when regularizing\n\nA `Field` that is neither reduced nor windowed along the boundary-normal\ndirection used to be read at plane 1 by every boundary (the `[i, j, 1]`\nfallback for arrays), which is wrong for the east, north and top boundaries.\nWhen the boundary conditions are regularized (by `FieldBoundaryConditions(grid,\nloc; ...)` or the model constructor), such a field is now windowed with `view`\nto its plane on (`Face`) or adjacent to (`Center`) the boundary, so that it is\nread there like the fields that are windowed by the user; the view shares its\ndata with the original field, so updating the field updates the condition.\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\n\n* Split the validation of Field boundary conditions into its two checks\n\nSpanning the whole boundary (no window along the tangential dimensions, which\nindex the condition directly) and a single plane along the boundary-normal\ndimension are two different requirements: check and explain them separately,\nwith their own error messages.\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Fable 5 <noreply@anthropic.com>",
+          "timestamp": "2026-08-19T23:06:16Z",
+          "url": "https://github.com/CliMA/Oceananigans.jl/commit/ac0d28ba900ef9a436622da87beabc74e226ff32"
+        },
+        "date": 1787184541419,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Default/tripolar 360x180x50 F64/NVIDIA TITAN V/default",
+            "value": 0.05600776708,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gu_",
+            "value": 2.432878,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gv_",
+            "value": 2.345423,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__rk_substep_turbulent_kinetic_energy_",
+            "value": 2.008657,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_CATKE_closure_fields_",
+            "value": 1.4616375,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.997688,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.993145,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.992857,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_w_from_continuity_",
+            "value": 0.320478,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_TKE_diffusivity_",
+            "value": 0.631099,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_split_explicit_transport_velocities_",
+            "value": 0.483836,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/180x90x50",
+            "value": 0.01672081409,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/720x360x50",
+            "value": 0.2153942925,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F32",
+            "value": 0.043665185610000004,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/nothing",
+            "value": 0.032340220770000004,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+Biharmonic",
+            "value": 0.08168354598000001,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+GM+Biharmonic",
+            "value": 0.25378533766,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/nothing+nothing",
+            "value": 0.036844459079999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant5+WENO5",
+            "value": 0.05013141417,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant9+WENO9",
+            "value": 0.07493915624,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon_zstar",
+            "value": 0.0695220852,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon_zstar",
+            "value": 0.06477786305000001,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar_zstar",
+            "value": 0.06275143489,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon",
+            "value": 0.0573298619,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon",
+            "value": 0.057622511259999995,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/3 tracers",
+            "value": 0.0600624314,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/360x180x50",
+            "value": 0.05600776708,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F64",
+            "value": 0.05600776708,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE",
+            "value": 0.05600776708,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariantDefault+WENO7",
+            "value": 0.05600776708,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar",
+            "value": 0.05600776708,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
+            "value": 0.05600776708,
             "unit": "s/timestep"
           }
         ]
