@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1788841830094,
+  "lastUpdate": 1788880262709,
   "repoUrl": "https://github.com/CliMA/Oceananigans.jl",
   "entries": {
     "Oceananigans.jl Benchmarks": [
@@ -47683,6 +47683,188 @@ window.BENCHMARK_DATA = {
           {
             "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
             "value": 0.057029811099999994,
+            "unit": "s/timestep"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Mosè Giordano",
+            "username": "giordano",
+            "email": "765740+giordano@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "ea00dbdae94163fc3158d8cca2e5a9d3a99262c0",
+          "message": "Skip the multi-region branch statically in apply_regionally! and construct_regionally (#5942)\n\n`apply_regionally!` and `construct_regionally` decided at run time whether\nany argument is a `MultiRegionObject` with `findfirst(isregional, args)`\nand `findfirst(isregional, kwargs)`. The latter iterates a `Base.Pairs`\nand does not constant-fold, so type inference explored the multi-region\nloop, with its splatted generators, using widened argument types at every\n`@apply_regionally` call site. Under a single\n`@apply_regionally build_active_cells_map(grid, ib)` Julia inferred\n`build_active_cells_map(::Any, ::Any)` (2.6 s) and\n`build_active_cells_map(::Union{AbstractGrid{..., <:Distributed}}, ::Any)`\n(3.7 s) in addition to the concrete method (0.27 s); the same happens in\n`Field` constructors, `update_state!` and every other user of the macro.\n\nDispatch on `isregional(args) || isregional(values(kwargs))` instead,\nwhich folds to `false` for non-regional arguments, and move the loop into\n`multi_region_apply!` / `multi_region_construct`. These stay `@inline`:\na `@noinline` variant made inference specialize them separately wherever\nthe arguments are abstract and raised the number of method instances\ninferred while constructing a `HydrostaticFreeSurfaceModel` from 72.5k to\n81k; with `@inline` it is 75.4k and total inference time is unchanged.\n\nConstructing an `ImmersedBoundaryGrid` on a 90x45x20\n`LatitudeLongitudeGrid` with `active_cells_map = true` goes from 13.8 s\nto 8.6 s on a cold session (Julia 1.12.7).\n\n\nClaude-Session: https://claude.ai/code/session_012PryTP2GQomPxXyj6pYo1M\n\nCo-authored-by: Claude Fable 5.1 <noreply@anthropic.com>",
+          "timestamp": "2026-09-08T12:14:26Z",
+          "url": "https://github.com/CliMA/Oceananigans.jl/commit/ea00dbdae94163fc3158d8cca2e5a9d3a99262c0"
+        },
+        "date": 1788880261403,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Default/tripolar 360x180x50 F64/NVIDIA TITAN V/default",
+            "value": 0.05702988213,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gu_",
+            "value": 2.4361475,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gv_",
+            "value": 2.3436355,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__rk_substep_turbulent_kinetic_energy_",
+            "value": 2.007413,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_CATKE_closure_fields_",
+            "value": 1.487528,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.998331,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.992571,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.99241,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_w_from_continuity_",
+            "value": 0.317566,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_TKE_diffusivity_",
+            "value": 0.631229,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_broadcast_kernel_cartesian",
+            "value": 0.130143,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/180x90x50",
+            "value": 0.01727993869,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/720x360x50",
+            "value": 0.21918511029,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F32",
+            "value": 0.04584616403,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/nothing",
+            "value": 0.03328025505,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+Biharmonic",
+            "value": 0.08269210694,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+GM+Biharmonic",
+            "value": 0.25528182344,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/nothing+nothing",
+            "value": 0.037844103,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant5+WENO5",
+            "value": 0.051065456769999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant9+WENO9",
+            "value": 0.07701469172,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon_zstar",
+            "value": 0.07082257316,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon_zstar",
+            "value": 0.06631011099,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar_zstar",
+            "value": 0.06409173943,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon",
+            "value": 0.05915921868,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon",
+            "value": 0.059213777380000006,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/3 tracers",
+            "value": 0.06117302549,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/360x180x50",
+            "value": 0.05702988213,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F64",
+            "value": 0.05702988213,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE",
+            "value": 0.05702988213,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariantDefault+WENO7",
+            "value": 0.05702988213,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar",
+            "value": 0.05702988213,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
+            "value": 0.05702988213,
             "unit": "s/timestep"
           }
         ]
