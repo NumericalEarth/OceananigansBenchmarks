@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1788907205285,
+  "lastUpdate": 1788914575001,
   "repoUrl": "https://github.com/CliMA/Oceananigans.jl",
   "entries": {
     "Oceananigans.jl Benchmarks": [
@@ -48957,6 +48957,188 @@ window.BENCHMARK_DATA = {
           {
             "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
             "value": 0.05700134395,
+            "unit": "s/timestep"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Mosè Giordano",
+            "username": "giordano",
+            "email": "765740+giordano@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "0bf8670b4b569b11273ff07049aa0d9f5404939b",
+          "message": "Make NonhydrostaticModel time stepping allocation free (#5945)\n\n* Make NonhydrostaticModel time stepping allocation free\n\nSeveral per-step loops of `NonhydrostaticModel` iterated heterogeneous\ntuples with runtime indices or names: the AB2/RK3 substep loop\n(`for (i, name) in enumerate(keys(model_fields))` with `exclude_periphery\n= i < 4` and `Val(i-3)`), the tracer-tendency loop, the flux boundary\ncondition loop (`foreach(i -> ..., 1:length(prognostic_fields))`),\n`cache_previous_tendencies!`, the AMD diffusivity loop, and the closure\ntuple loops in `compute_closure_fields!` / `step_closure_prognostics!`.\nEach `launch!` inside them was a dynamic call with about twenty boxed\narguments. `compute_auxiliaries!` also passed the kernel parameters as\nthe runtime symbol `:xyz`, `make_pressure_correction!` scaled the\npressure through `Field` broadcasting, and the FFT solvers looped over\ntheir heterogeneous transform tuples.\n\nRewrite these as recursions over `Val`-wrapped names, the pattern already\nused by `HydrostaticFreeSurfaceModel`; the AB2 and RK3 steps share\n`step_prognostic_fields!`, which takes the launch closures for velocities\nand tracers so that `exclude_periphery` is a literal at the launch site.\nTuples such as `fields(model)` and the advecting velocities are rebuilt\nat each level of the recursions rather than passed down, because passing\nthem allocates. The default `κ_parameters` becomes `Val(:xyz)`, which\nkeeps the active-cells-map semantics of `:xyz` while being static, and\nthe pressure is scaled by a kernel over the same interior range the\nbroadcast used. The velocity `implicit_step!` receives `nothing` as\ntracer index (as in the hydrostatic model) instead of `Val(i - 3)`; no\nviscosity dispatches on it.\n\nAllocations per `time_step!` on a 16x12x10 grid (Julia 1.12.7, CPU):\n\n  RK3, WENO(5), AMD, T/S                     1,185,968 -> 1,616 B\n  AB2, same                                    395,184 ->   560 B\n  RK3, closure tuple (AMD + ScalarDiffusivity) 1,217,696 -> 1,616 B\n  RK3, implicit VerticalScalarDiffusivity,\n       immersed grid with active map         1,171,232 -> 5,120 B\n  AB2, stretched grid (Fourier-tridiagonal)    507,584 -> 1,424 B\n\nAll five produce bit-identical fields after five steps, as do the\nhydrostatic configurations that share the closure-tuple and transform\ncode. The CPU nonhydrostatic budgets in `test/test_memory_allocation.jl`\nare tightened accordingly (5.8e5-6.5e5 -> 1,700-10,500 bytes); the GPU\nand distributed budgets are left unchanged since they were not measured.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_012PryTP2GQomPxXyj6pYo1M\n\n* Make hydrostatic time stepping with closure tuples allocation free\n\nWith a tuple of closures, `implicit_step!` filtered the vertically implicit\nclosures with a generator, `Tuple(closure[n] for n = 1:N if ...)`, whose\nresult has a length unknown to the compiler. Every implicit step (one per\nvelocity component and tracer, per stage) therefore dispatched `solve!`\ndynamically with boxed arguments. `hasclosure` received the closure type as a\nplain value rather than a `::Type{T}` argument, so `closure isa ClosureType`\nwas evaluated dynamically for every tracer at every stage, and\n`RiBasedVerticalDiffusivity` rebuilt the top tracer boundary conditions with a\n`NamedTuple` generator on every call to `compute_closure_fields!`.\n\nThe filter is now a recursion over the tuple, `hasclosure` specializes on the\nclosure type, and the Ri-based closure uses `map` over the tracers.\n\nMeasured per time step on CPU (16×12×10 grid, T and S tracers, split-explicit\nfree surface, quasi-Adams-Bashforth):\n\n    (CATKE, HorizontalScalarDiffusivity):        345 allocs, 326 KB -> 5 allocs, 592 B\n    (HorizontalScalar, VerticalScalar implicit):  350 allocs,  83 KB -> 2 allocs,  64 B\n    RiBasedVerticalDiffusivity:                    29 allocs,  23 KB -> 2 allocs,  64 B\n\nResults are bit-identical to `main` for these configurations after five time\nsteps, with both the quasi-Adams-Bashforth and split Runge-Kutta steppers.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_012PryTP2GQomPxXyj6pYo1M\n\n* Update GPU memory allocations bounds\n\n---------\n\nCo-authored-by: Claude Fable 5.1 <noreply@anthropic.com>",
+          "timestamp": "2026-09-08T21:15:16Z",
+          "url": "https://github.com/CliMA/Oceananigans.jl/commit/0bf8670b4b569b11273ff07049aa0d9f5404939b"
+        },
+        "date": 1788914573770,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Default/tripolar 360x180x50 F64/NVIDIA TITAN V/default",
+            "value": 0.05704652425,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gu_",
+            "value": 2.4361,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gv_",
+            "value": 2.344036,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__rk_substep_turbulent_kinetic_energy_",
+            "value": 2.007222,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_CATKE_closure_fields_",
+            "value": 1.487497,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.997882,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.992668,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.992443,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_w_from_continuity_",
+            "value": 0.317087,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_TKE_diffusivity_",
+            "value": 0.631485,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_broadcast_kernel_cartesian",
+            "value": 0.130144,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/180x90x50",
+            "value": 0.01732477856,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/720x360x50",
+            "value": 0.21898853081,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F32",
+            "value": 0.04712887527,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/nothing",
+            "value": 0.03315359511,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+Biharmonic",
+            "value": 0.08259946897,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+GM+Biharmonic",
+            "value": 0.25515258603,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/nothing+nothing",
+            "value": 0.03781929324,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant5+WENO5",
+            "value": 0.05110457814,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant9+WENO9",
+            "value": 0.07602895687,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon_zstar",
+            "value": 0.07089612495,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon_zstar",
+            "value": 0.06635765976,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar_zstar",
+            "value": 0.06383834418,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon",
+            "value": 0.05885636667,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon",
+            "value": 0.05894288088,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/3 tracers",
+            "value": 0.06109172575,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/360x180x50",
+            "value": 0.05704652425,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F64",
+            "value": 0.05704652425,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE",
+            "value": 0.05704652425,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariantDefault+WENO7",
+            "value": 0.05704652425,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar",
+            "value": 0.05704652425,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
+            "value": 0.05704652425,
             "unit": "s/timestep"
           }
         ]
