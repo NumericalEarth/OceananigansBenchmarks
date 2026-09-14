@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1789388020434,
+  "lastUpdate": 1789393786263,
   "repoUrl": "https://github.com/CliMA/Oceananigans.jl",
   "entries": {
     "Oceananigans.jl Benchmarks": [
@@ -52597,6 +52597,188 @@ window.BENCHMARK_DATA = {
           {
             "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
             "value": 0.056123564300000005,
+            "unit": "s/timestep"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Enrique Curchitser",
+            "username": "enri66",
+            "email": "enrique@esm.rutgers.edu"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "9b9485d5ed4cae03219d1a97d9e02ef5c504c422",
+          "message": "Add ObliqueRadiation: a two-dimensional open boundary radiation scheme (#5962)\n\n* Add ObliqueRadiation: a two-dimensional open boundary radiation scheme\n\nNormalRadiation diagnoses a phase speed in the boundary-normal direction only,\nwhich is optimal when a signal arrives perpendicular to the boundary and degrades\nas the angle of incidence grows. ObliqueRadiation diagnoses both components\n(Raymond & Kuo 1984):\n\n    dphi/dt + c_n dphi/dn + c_t dphi/dt_hat = -(phi - phi_ext)/tau\n\n    c_n = -(d_t phi)(d_n phi)/|grad phi|^2,  c_t = -(d_t phi)(d_t_hat phi)/|grad phi|^2\n    |grad phi|^2 = (d_n phi)^2 + (d_t_hat phi)^2\n\nThe tangential derivative is upwinded following ROMS, and c_t is limited to a\ntangential Courant number of one. Inflow versus outflow is decided from the\nboundary-normal velocity rather than the sign of the diagnosed phase speed, and\nc_n, c_t are set to zero on inflow -- the same convention NormalRadiation uses,\nand for the same reason: a vanishing gradient makes the phase-speed ratio blow up\nand flip sign as an extremum exits.\n\nReduces exactly to NormalRadiation when the tangential gradient vanishes: then\n|grad phi|^2 = (d_n phi)^2, c_n collapses to the Orlanski ratio and c_t = 0. That\nis the defining property and it is the first test.\n\nRequires no new storage. NormalRadiation already holds the previous-timestep\nboundary and interior values as two-dimensional slabs over the boundary face, so\nthe tangential neighbours the oblique term needs are already there; the same\nmaterialize_radiation_storage / regularize_boundary_condition hooks are reused.\nApplied on the four lateral boundaries; top and bottom fall back to the existing\none-dimensional kernel, as ROMS also does.\n\nUsable as the scheme of a NormalFlowBoundaryCondition (boundary-normal velocities)\nor a ValueBoundaryCondition (Center-located fields), exactly like NormalRadiation.\nNo existing scheme is modified.\n\nPorted from ROMS u3dbc_im.F / v3dbc_im.F (MIT/X licensed).\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n\n* Disambiguate ObliqueRadiation regularization on tripolar grids\n\nThe quality-assurance tests failed on this PR: the method-ambiguity count is\nasserted to be exactly 269, and the new `regularize_boundary_condition` method\nfor ObliqueRadiation adds ambiguities, which also fails \"No ambiguities for\nmodule OrthogonalSphericalShellGrids\".\n\nCause: `regularize_boundary_condition(bc::ORBC, grid, loc, dim, args...)`\nspecializes on the boundary condition, while the tripolar extensions add\npass-through methods `regularize_boundary_condition(bc::BoundaryCondition,\ngrid::SerialTRG / DistTRG, loc, dim, bound, prognostic_names, sign)` that\nspecialize on the grid. For an ObliqueRadiation condition on a tripolar grid\nneither is more specific, so Julia cannot choose.\n\nNormalRadiation already hits exactly this and is resolved by dedicated\ntie-breakers in the same two files (\"Only to solve the ambiguities (this method\nshould never be used)\"). This adds the matching tie-breaker for ORBC beside\neach of them. One line per file; no existing scheme is modified, and the\ntie-breakers return `bc` unchanged exactly as the RBC ones do, since an open\nboundary is not meaningful on a global tripolar grid.\n\nThe same failure and the same fix apply to #5964 (TracerReservoir).\n\nVerified locally with test/test_quality_assurance.jl: ambiguity count 314, matching the\nassertion on this branch's base; QA 93 passed, 0 failed, 5 broken (pre-existing\ntype-piracy markers).\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n\n* Share the radiation machinery between NormalRadiation and ObliqueRadiation\n\nFollowing review: add an AbstractRadiationScheme supertype and define RBC, storage\nallocation, Adapt and show once over it; keep a single set of radiate_*_halo! methods\nwhose lateral update dispatches on the scheme through radiation_update. ObliqueRadiation\nnow adds only its constructor, kernel and tangential differencing. The ORBC\nregularization method and its tripolar tie-breakers are removed.\n\nAlso trims comments and docstrings, corrects the defaults in the ObliqueRadiation\ndocstring signature (0 and Inf), and folds the four ObliqueRadiation tests into two:\nreduction to Orlanski at zero tangential gradient (outflow and inflow), and a tracer\nblob leaving the domain through an oblique open boundary.\n\nBoth schemes give bitwise-identical results to the previous commit.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n\n* Fix ObliqueRadiation reading tangential neighbours the same fill overwrites\n\nThe tangential differences read neighbouring entries of the φᵇ and φ₁ slabs,\nwhich the same kernel overwrites on anchored fills (every fill under\nQuasiAdamsBashforth2, whose clock stays at stage 1). The differences mixed the\nprevious and current anchors and depended on execution order.\n\nObliqueRadiation now keeps the boundary and first-interior values written during\nthe previous iteration in two arrays double-buffered on iteration parity: a fill\nreads one buffer and writes the other. The values read equal the anchors, so the\nupdate is the intended Raymond & Kuo one. NormalRadiation is unchanged.\n\nThe end-to-end test is replaced by a mirror-symmetry check with centered\nadvection, where the boundary value reaches the interior. It fails before this\nchange (asymmetry 6.7e-3) and passes after.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n\n* Give the radiation kernels descriptive names\n\norlanski_radiation -> normal_radiation_update and\nraymond_kuo_radiation -> oblique_radiation_update, following review. The\nreferences in the docstrings keep the authors' names. No change in results.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n\n* Print radiation schemes by their bare type name; drop two comments\n\nThe shared summary built the name with string(getnamewrapper(r)), which prints\nthe module-qualified name wherever the type is not in scope in Main — as in\nDocumenter's doctest sandbox, where ObliqueRadiation's doctest failed. Use\nnameof(typeof(r)) instead.\n\nAlso removes the field-order comment above AbstractRadiationScheme (review\nsuggestion) and the comment above radiate_top_halo!, which did not explain\nanything the code does not show.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Opus 5 <noreply@anthropic.com>",
+          "timestamp": "2026-09-14T13:12:15Z",
+          "url": "https://github.com/CliMA/Oceananigans.jl/commit/9b9485d5ed4cae03219d1a97d9e02ef5c504c422"
+        },
+        "date": 1789393785171,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Default/tripolar 360x180x50 F64/NVIDIA TITAN V/default",
+            "value": 0.05614148822,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gu_",
+            "value": 2.402226,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gv_",
+            "value": 2.2976345,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__rk_substep_turbulent_kinetic_energy_",
+            "value": 2.004693,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_CATKE_closure_fields_",
+            "value": 1.488119,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.926714,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.923386,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.922939,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_w_from_continuity_",
+            "value": 0.316159,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_TKE_diffusivity_",
+            "value": 0.630428,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_broadcast_kernel_cartesian",
+            "value": 0.130111,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/180x90x50",
+            "value": 0.01722924119,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/720x360x50",
+            "value": 0.21569118727,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F32",
+            "value": 0.04589884238,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/nothing",
+            "value": 0.03386133492,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+Biharmonic",
+            "value": 0.08120266155,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+GM+Biharmonic",
+            "value": 0.24397389334,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/nothing+nothing",
+            "value": 0.03786706529,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant5+WENO5",
+            "value": 0.05076312375,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant9+WENO9",
+            "value": 0.07387593545,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon_zstar",
+            "value": 0.06919592089,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon_zstar",
+            "value": 0.06513769145000001,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar_zstar",
+            "value": 0.06279996683,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon",
+            "value": 0.05680767628,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon",
+            "value": 0.05787143307,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/3 tracers",
+            "value": 0.06001646582,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/360x180x50",
+            "value": 0.05614148822,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F64",
+            "value": 0.05614148822,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE",
+            "value": 0.05614148822,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariantDefault+WENO7",
+            "value": 0.05614148822,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar",
+            "value": 0.05614148822,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
+            "value": 0.05614148822,
             "unit": "s/timestep"
           }
         ]
