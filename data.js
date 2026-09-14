@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1789424407567,
+  "lastUpdate": 1789426732939,
   "repoUrl": "https://github.com/CliMA/Oceananigans.jl",
   "entries": {
     "Oceananigans.jl Benchmarks": [
@@ -52961,6 +52961,188 @@ window.BENCHMARK_DATA = {
           {
             "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
             "value": 0.056188335250000006,
+            "unit": "s/timestep"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Mosè Giordano",
+            "username": "giordano",
+            "email": "765740+giordano@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "b5c8658e57bfd054e3bd572a509d58b3801edc01",
+          "message": "Crack down on all method ambiguities (#5983)\n\n* Resolve the method ambiguities in BoundaryConditions\n\n`fill_halo_event!` had one set of methods dispatching on the kernel type\n(`PeriodicFillHalo`, `MultiRegionFillHalo`) and another dispatching on the\nboundary-condition tuple type (normal-flow pairs, polar pairs), which made\nevery combination ambiguous (24 pairs, kwcall included). One combination is\nreachable: a velocity with an impenetrable boundary on one side and a polar\nboundary on the other, as on a `LatitudeLongitudeGrid` spanning\n`latitude=(-80, 90)`, failed with a `MethodError` in `fill_halo_regions!`\nand prevented a `HydrostaticFreeSurfaceModel` from time stepping. The\nnormal-flow and polar behaviours now live in two per-boundary-condition\nhooks, `fills_halo` and `prepare_halo_fill!`, called from the generic\nmethods, so only the kernel type is dispatched on. Existing behaviour is\nkept: all-normal-flow halos are skipped when `fill_normal_flow_bcs=false`\nand polar values are refreshed before every fill; the mixed case now fills\nboth sides.\n\nAlso:\n- `fill_priority`: the tuple members of `PBCT`/`MCBCT`/`DCBCT` require at\n  least one element so the empty tuple no longer matches all three.\n- `compute_{x,y,z}_bcs!`: the tendency argument is an `AbstractArray`, which\n  is disjoint from the `::Nothing` shortcut.\n- `getbc` for `ContinuousBoundaryFunction`: the tangential location\n  parameters are bounded to `Union{Nothing, Center, Face}`, so a function\n  cannot be boundary-adjacent in two directions.\n- `fill_halo_regions!` with `nothing` boundary conditions on distributed and\n  multi-region grids gets explicit no-op methods.\n\nAdds a regression test for the impenetrable/polar combination.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01VHciC8x39gm97sABrSvBkt\n\n* Resolve the method ambiguities in Fields\n\nCatch-all second arguments on `Field` methods collided with Base,\nStaticArrays, GPUArrays, StructArrays and SparseArrays methods that take an\n`AbstractArray` in the other slot:\n\n- `==` between a `Field` and anything is restricted to `AbstractArray`\n  operands; comparisons with numbers still fall back to Base.\n- `+`/`-` between an `AbstractField` and a `StaticArray` get explicit\n  methods, more specific than both StaticArrays' and ours.\n- `similar(f::Field, grid)` requires an `AbstractGrid`.\n- `copyto!(::Field, ::Broadcasted)` only handles `DefaultArrayStyle`\n  broadcasts, the only ones that reach it; the zero-dimensional style has\n  its own method because Base specialises on it.\n- `materialize!` for a `Field` destination is specialised on\n  `FieldBroadcastStyle`, the only style `combine_styles` produces for it.\n- `set!(::Field, ::Nothing)` is defined; it was ambiguous, i.e. an error.\n- Fields reduced in x and y or in y and z work as boundary conditions: the\n  surviving index sits in the same slot on both admissible boundaries.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01VHciC8x39gm97sABrSvBkt\n\n* Resolve the method ambiguities in Grids, Operators, ImmersedBoundaries and Solvers\n\nEach of these is a pair of specialisations on different arguments (or on\ndifferent type parameters of the grid) with no method for the case where\nboth apply:\n\n- `xnodes`/`ynodes` with a `nothing` location on immersed and\n  latitude-longitude grids.\n- `parent_index_range` for a full `Base.Slice` combined with a reduced\n  location or a `Colon` view.\n- `stretched_dimensions`/`stretched_direction` for grids regular in all three\n  directions; the callers' `isa XYZRegularRG` special case moves into the\n  method.\n- `generate_coordinate` for a periodic `MutableVerticalDiscretization` uses\n  the eight-argument signature the grid constructors call; the seven-argument\n  form was unreachable.\n- Column depths and partial-cell spacings on immersed grids flat in both\n  horizontal directions; `flattened_node` on grids flat in all directions;\n  `fractional_horizontal_area` on horizontally flat grids.\n- Array-index `rnode`, `Δzᵃᵃᶜ`, `Δzᵃᵃᶠ` on immersed grids, and array-index\n  `Δx`/`Δy` metrics on latitude-longitude grids with on-the-fly metrics,\n  built the same way as the precomputed-metric versions.\n- `NoTransform` has every field `nothing`, so its call method is\n  specialised on both the plan and the direction.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01VHciC8x39gm97sABrSvBkt\n\n* Resolve the method ambiguities in TurbulenceClosures and TimeSteppers\n\nThe diffusivity extractors `ν***(i, j, k, grid, loc, ν, clk, fields)` for\n`Number`, `Function` and `DiscreteDiffusionFunction` coefficients share\ntheir arity with `ν***(i, j, k, grid, closure, K, clk, fields)`, so a\nclosure in the fifth slot and a number in the sixth matched both (33 pairs).\nThe location argument is now typed `::Tuple`, which every\n`viscosity_location`/`diffusivity_location` returns.\n\n`step_closure_prognostics!(model, Δt)` collided with the closure-dispatching\n`step_closure_prognostics!(closure_fields, closure, args...)`; the time step\nis now a `Number`.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01VHciC8x39gm97sABrSvBkt\n\n* Resolve the method ambiguities in MultiRegion and DistributedComputations\n\n- `Partition`/`validate_partition` with `Equal()` in more than one direction\n  throw an `ArgumentError` instead of being ambiguous.\n- The `Vararg` `CommunicationBuffers(::MultiRegionGrids, args...)` is\n  removed: multi-region buffers are only built through\n  `Fields.communication_buffers`, which already handles missing boundary\n  conditions.\n- `FunctionMRO`/`ArrayMRO` require at least one region so the empty tuple\n  matches neither.\n- `set!` on a `MultiRegionField` gets methods for the value types that\n  `set!(::Field, ...)` specialises on (arrays, fields, `ZeroField`,\n  `nothing`, GPU arrays in the extensions); `compute!` and `show` for a\n  multi-region `Scan` field apply the regional path.\n- The architecture parameter of `MultiRegionGrid` and of the immersed\n  multi-region aliases is bounded to `AbstractSerialArchitecture`.\n  Multi-region grids are never distributed, and the bound lets dispatch know\n  that multi-region and distributed fields are disjoint, which removes the\n  remaining `set!` and `with_halo` pairs.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01VHciC8x39gm97sABrSvBkt\n\n* Resolve the method ambiguities of PrescribedVelocityFields\n\n`hydrostatic_tendency_fields` specialised on the free surface and on\n`PrescribedVelocityFields` separately; `sum_of_velocities` specialised on a\n`PrescribedVelocityFields` in each slot separately. The combinations get\nexplicit methods.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01VHciC8x39gm97sABrSvBkt\n\n* Lower the ambiguity cap to 9 and check more modules for ambiguities\n\n`detect_ambiguities(Oceananigans; recursive=true)` reports 9 pairs on both\nJulia 1.12 and 1.13 with the test dependencies loaded: the six multiary `*`\nmethods of AbstractOperations against LinearAlgebra, two `copyto!` pairs\nagainst `SparseArrays.CHOLMOD.Dense`, and `getbc` for a field reduced in\nx and z. Every module other than AbstractOperations and Fields is now\nambiguity-free and is checked as such.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01VHciC8x39gm97sABrSvBkt\n\n* Rename `TangentialLocation` -> `PossibleLocation`\n\nCo-authored-by: Simone Silvestri <33547697+simone-silvestri@users.noreply.github.com>\n\n---------\n\nCo-authored-by: Claude Fable 5.1 <noreply@anthropic.com>\nCo-authored-by: Simone Silvestri <33547697+simone-silvestri@users.noreply.github.com>",
+          "timestamp": "2026-09-14T21:28:54Z",
+          "url": "https://github.com/CliMA/Oceananigans.jl/commit/b5c8658e57bfd054e3bd572a509d58b3801edc01"
+        },
+        "date": 1789426731199,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Default/tripolar 360x180x50 F64/NVIDIA TITAN V/default",
+            "value": 0.056132109879999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gu_",
+            "value": 2.402514,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gv_",
+            "value": 2.297683,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__rk_substep_turbulent_kinetic_energy_",
+            "value": 2.002901,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_CATKE_closure_fields_",
+            "value": 1.488119,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.927003,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.923643,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.923162,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_w_from_continuity_",
+            "value": 0.315679,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_TKE_diffusivity_",
+            "value": 0.630588,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_broadcast_kernel_cartesian",
+            "value": 0.130111,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/180x90x50",
+            "value": 0.01695372399,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/720x360x50",
+            "value": 0.21553188165,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F32",
+            "value": 0.04606645033,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/nothing",
+            "value": 0.03233306784,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+Biharmonic",
+            "value": 0.08113521933,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+GM+Biharmonic",
+            "value": 0.24311236656,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/nothing+nothing",
+            "value": 0.03782372829,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant5+WENO5",
+            "value": 0.05072068174,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant9+WENO9",
+            "value": 0.07381906041,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon_zstar",
+            "value": 0.0691794104,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon_zstar",
+            "value": 0.06513760444,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar_zstar",
+            "value": 0.06282253701,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon",
+            "value": 0.05680373607,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon",
+            "value": 0.057899841109999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/3 tracers",
+            "value": 0.060014433250000006,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/360x180x50",
+            "value": 0.056132109879999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F64",
+            "value": 0.056132109879999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE",
+            "value": 0.056132109879999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariantDefault+WENO7",
+            "value": 0.056132109879999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar",
+            "value": 0.056132109879999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
+            "value": 0.056132109879999996,
             "unit": "s/timestep"
           }
         ]
