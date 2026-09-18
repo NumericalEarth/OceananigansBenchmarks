@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1789738226473,
+  "lastUpdate": 1789758033598,
   "repoUrl": "https://github.com/CliMA/Oceananigans.jl",
   "entries": {
     "Oceananigans.jl Benchmarks": [
@@ -56419,6 +56419,188 @@ window.BENCHMARK_DATA = {
           {
             "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
             "value": 0.0560609224,
+            "unit": "s/timestep"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Mosè Giordano",
+            "username": "giordano",
+            "email": "765740+giordano@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "9454e12c3f36d11cdc45278bf4556f3204b1ca4f",
+          "message": "Various minor improvements to the test suite (#5999)\n\n* Run grid-independent interpolation tests once per architecture\n\nThe longitude conversion checks, the wrap-around interpolation between\nlatitude-longitude grids and the fine-grid precision checks inside\n`run_field_interpolation_tests` never used the grid argument, so they\nran four times per architecture (two grids × two float types). They\nnow live in `run_longitude_interpolation_tests(arch)`, called once.\nThe million-element longitude check becomes a single `@test all(...)`\ninstead of a million recorded test results.\n\nAlso hoist the latitude-longitude grid out of the location loop in the\nunit interpolation tests, and drop an inner `for arch in archs` loop\nwhose body only used a CPU grid built outside it.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01C2iA9K5yMn5W6B18fDQwSg\n\n* Run the minimal-restore reference simulation once per model\n\nThe three pickup methods only differ in how `set!` locates the\ncheckpoint. The reference run that writes the checkpoints was repeated\nfor each of them; it now runs once per model type and the pickup\nmethods loop over the restore phase only, keeping one testset per\nmethod.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01C2iA9K5yMn5W6B18fDQwSg\n\n* Move grid-independent computed field tests out of the grid loop\n\n`computation_including_boundaries` and `computations_with_buoyancy_field`\nbuild their own grid and model from `arch` alone, so running them for\neach of the three grids repeated the same work three times.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01C2iA9K5yMn5W6B18fDQwSg\n\n* Do not rebuild two-dimensional Poisson grids for every 3D topology\n\nThe comprehension building the two-dimensional grids shadowed the outer\n`topo`, so all six 2D grids were built and solved for each of the\neight 3D topologies. They now get their own loop.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01C2iA9K5yMn5W6B18fDQwSg\n\n* Avoid repeating writer-independent FieldTimeSeries tests\n\nThe pickup and array boundary condition tests build their own JLD2\noutput and never look at the writer being iterated, so they ran twice.\nThe reductions test re-read each series from disk once per reduction\nfunction; it now reads once per variable.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01C2iA9K5yMn5W6B18fDQwSg\n\n* Compute the cubed-sphere orthogonality reference once per architecture\n\nIt does not depend on the fold topology, so it was rebuilt for each.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01C2iA9K5yMn5W6B18fDQwSg\n\n* Pass non_uniform_conformal_mapping to the interpolation test grid\n\nThe loop iterated over both mappings but only used the flag in the log\nmessage, so the non-uniform mapping was never exercised and the uniform\ncase ran twice.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01C2iA9K5yMn5W6B18fDQwSg\n\n* Build multi-region reference fields once per grid\n\nThe single-region reference fields depend only on the grid and field\ntype, not on the partition, and the multi-region grid was constructed\na second time inside the immersed boundary loop.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01C2iA9K5yMn5W6B18fDQwSg\n\n* Build allocation test grids once per immersed mode\n\nThe grid and the work layout inference checks do not depend on the\nmodel being built, so iterate over models inside the grid loop.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01C2iA9K5yMn5W6B18fDQwSg\n\n* Build serial reference tripolar grids once and drop triplicated tests\n\nThe global grid and the serial reference fields do not depend on the\ndistributed architecture, and the metric comparison was written three\ntimes verbatim.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01C2iA9K5yMn5W6B18fDQwSg\n\n* Remove duplicated entries from the grid metrics tuple\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01C2iA9K5yMn5W6B18fDQwSg\n\n* Build biogeochemistry test grids once per architecture\n\nThe grid tuple was evaluated for every biogeochemistry and model\ncombination, including the ones the loop then skips.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01C2iA9K5yMn5W6B18fDQwSg\n\n* Solve single tridiagonal systems once per vertical size\n\n`can_solve_single_tridiagonal_system` only depends on `Nz`, so it was\nrun four times for each combination of the unused `Nx` and `Ny`.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01C2iA9K5yMn5W6B18fDQwSg\n\n* Build advective timescale CFL test grids with the tested float type\n\nTwo of the CFL helpers ignored `FT` when constructing the grid, so the\nFloat32 pass built and stepped the same Float64 model as the Float64\npass, as the other helpers in the file already avoid.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01C2iA9K5yMn5W6B18fDQwSg\n\n* Remove nested architecture loop in FieldTimeSeries set! test\n\nThe inner loop re-ran the body for every architecture on grids built\nfrom the outer one.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01C2iA9K5yMn5W6B18fDQwSg\n\n* Use the iterated architecture in the time-step wizard test\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01C2iA9K5yMn5W6B18fDQwSg\n\n* Hoist grid out of the variable diffusivity closure loop\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01C2iA9K5yMn5W6B18fDQwSg\n\n* Build the budget test grid once per topology\n\nIt does not depend on the time discretization or closure.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01C2iA9K5yMn5W6B18fDQwSg\n\n* Build the bounds-preserving advection grid once\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01C2iA9K5yMn5W6B18fDQwSg\n\n* Compute the explicit triad operator once\n\nThe self-adjointness and implicit-versus-explicit testsets built the\nsame matrix (48 time steps each) with the same default time step.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01C2iA9K5yMn5W6B18fDQwSg\n\n* Build the immersed reduction test grid on the tested architecture\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01C2iA9K5yMn5W6B18fDQwSg\n\n---------\n\nCo-authored-by: Claude Fable 5.1 <noreply@anthropic.com>",
+          "timestamp": "2026-09-18T18:15:13Z",
+          "url": "https://github.com/CliMA/Oceananigans.jl/commit/9454e12c3f36d11cdc45278bf4556f3204b1ca4f"
+        },
+        "date": 1789758033043,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Default/tripolar 360x180x50 F64/NVIDIA TITAN V/default",
+            "value": 0.056068214889999995,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gu_",
+            "value": 2.4015215,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gv_",
+            "value": 2.297458,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__rk_substep_turbulent_kinetic_energy_",
+            "value": 1.997044,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_CATKE_closure_fields_",
+            "value": 1.469399,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.944411,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.939642,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.939354,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_w_from_continuity_",
+            "value": 0.316702,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_broadcast_kernel_cartesian",
+            "value": 0.130143,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_TKE_diffusivity_",
+            "value": 0.594525,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/180x90x50",
+            "value": 0.016912777990000002,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/720x360x50",
+            "value": 0.21521211024,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F32",
+            "value": 0.044138268,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/nothing",
+            "value": 0.03234821147,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+Biharmonic",
+            "value": 0.08096710522,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+GM+Biharmonic",
+            "value": 0.25003713918,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/nothing+nothing",
+            "value": 0.03772058561,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant5+WENO5",
+            "value": 0.050697360749999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant9+WENO9",
+            "value": 0.07405775033,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon_zstar",
+            "value": 0.06915414611,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon_zstar",
+            "value": 0.06448369871,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar_zstar",
+            "value": 0.06279541453,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon",
+            "value": 0.05678541641,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon",
+            "value": 0.05788218409,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/3 tracers",
+            "value": 0.0599715033,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/360x180x50",
+            "value": 0.056068214889999995,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F64",
+            "value": 0.056068214889999995,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE",
+            "value": 0.056068214889999995,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariantDefault+WENO7",
+            "value": 0.056068214889999995,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar",
+            "value": 0.056068214889999995,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
+            "value": 0.056068214889999995,
             "unit": "s/timestep"
           }
         ]
