@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790314887190,
+  "lastUpdate": 1790317455050,
   "repoUrl": "https://github.com/CliMA/Oceananigans.jl",
   "entries": {
     "Oceananigans.jl Benchmarks": [
@@ -58967,6 +58967,188 @@ window.BENCHMARK_DATA = {
           {
             "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
             "value": 0.05606489935,
+            "unit": "s/timestep"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Enrique Curchitser",
+            "username": "enri66",
+            "email": "curchitser@gmail.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "1e6c09de4d89d1b5ccbd622ead341b2d5c152b19",
+          "message": "Add TracerReservoir: open boundary tracer reservoirs (#5964)\n\n* Add TracerReservoir: open boundary tracer reservoirs after MOM6\n\nA prescribed-value open boundary has no memory: the instant the flow reverses,\nwater re-entering the domain carries the exterior value no matter what just left.\nAcross a tidal cycle or an eddy brushing the boundary that manufactures a spurious\ntracer flux -- the domain exports its own water and imports someone else's, even\nthough the net displacement over the cycle is exactly zero.\n\nTracerReservoir carries one extra value per boundary point, the concentration of\nthe water just outside, relaxed not in time but in DISTANCE ADVECTED: each step the\nflow moves d = |u_n| dt across the boundary face and the reservoir is relaxed over a\nlength scale L toward whichever reservoir the flow is filling, as a backward-Euler\nstep so it is unconditionally stable. On outflow it fills with the interior value;\non inflow it is flushed toward the exterior value. The halo takes the reservoir\nvalue, so returning water carries back what left.\n\nThis is the length-scale form of MOM6's update_segment_tracer_reservoirs, with the\nsame three regimes per direction -- instant (L = 0), finite, and frozen (L = Inf) --\nwritten as a single branch rather than the mask-and-sentinel arithmetic Fortran\nneeds. Both length scales default to 0, MOM6's own default, so TracerReservoir()\nis memoryless and the reservoir is strictly opt-in.\n\nValue classification, Center-located fields, all six boundaries. Reuses the existing\nmaterialize_radiation_storage / regularize_boundary_condition hooks and\nNormalRadiation's anchor/latest convention for multi-stage steppers. No existing\nscheme is modified.\n\nVerified on a prescribed uniform oscillating flow where the exact answer is known:\nover a whole number of periods the net displacement is zero, so a uniform tracer\nmust be unchanged. A frozen reservoir returns exactly the water it exported (1.0000\nto machine precision) while a memoryless boundary loses 6.5% of the domain's water\nin a single cycle.\n\nThe benefit is not monotone and the docstring says so: a reservoir holds ONE number\nper boundary point, so at the reversal it feeds a constant back in while the water\nthat actually returns has a declining profile. Relaxing toward the exterior during\ninflow mimics that decline. Scanning a translating-patch problem over two patch\nwidths and two excursions puts the optimum at inflow_length_scale ~ 0.3 D, where\nD = 2U/omega is the parcel excursion -- scaling with the distance travelled, not\nwith the width of the tracer structure, as it must for a scheme that relaxes over a\ndistance advected.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n\n* Disambiguate TracerReservoir regularization on tripolar grids\n\nThe quality-assurance tests failed on this PR: the method-ambiguity count is\nasserted to be exactly 269 and came out 271, and \"No ambiguities for module\nOrthogonalSphericalShellGrids\" failed on the same two pairs.\n\nCause: `regularize_boundary_condition(bc::TRVBC, grid, loc, dim, args...)`\nspecializes on the boundary condition, while the tripolar extensions add\npass-through methods `regularize_boundary_condition(bc::BoundaryCondition,\ngrid::SerialTRG / DistTRG, loc, dim, bound, prognostic_names, sign)` that\nspecialize on the grid. For a TracerReservoir condition on a tripolar grid\nneither is more specific, so Julia cannot choose.\n\nNormalRadiation already hits exactly this and is resolved by dedicated\ntie-breakers in the same two files (\"Only to solve the ambiguities (this method\nshould never be used)\"). This adds the matching tie-breaker for TRVBC beside\neach of them. One line per file; no existing scheme is modified, and the\ntie-breakers return `bc` unchanged exactly as the RBC ones do, since an open\nboundary is not meaningful on a global tripolar grid.\n\nAn alternative was to widen `RBC` to every storage-carrying scheme and delete\nthe TRVBC `regularize_boundary_condition` method, whose body is the same as the\nRBC one. That removes code, but it modifies NormalRadiation and would make this\nPR and #5962 edit the same lines, so it is left for a possible follow-up.\n\nVerified locally with test/test_quality_assurance.jl: ambiguity count back to exactly 269;\nQA 94 passed, 0 failed, 4 broken (the pre-existing type-piracy markers, as on main).\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n\n* TracerReservoir: restraint pass on docstring, comments and tests\n\nThe docstring describes the scheme; the motivation and the guidance on choosing\ninflow_length_scale stay in the PR description. Removes the comments mapping the\ncode onto MOM6 and the Lˢ guard in reservoir_update: ifelse already discards the\nunselected branch, so the update is bitwise identical (checked over 8640 inputs,\nFloat32 and Float64).\n\nTests: drop the check that locked in that guard and the defensive NaN and bounds\nchecks; the end-to-end test also runs the reservoir on the west boundary with the\nflow reversed and checks it gives the same answer.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n\n* Add a validation script demonstrating TracerReservoir vs a memoryless boundary\n\nAn oscillating flow with zero net displacement per period should leave a\nuniform tracer unchanged. A memoryless boundary loses ~8% of the tracer per\nperiod; TracerReservoir with a frozen or finite length scale recovers it.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>\n\n* Drop the disputed reference from TracerReservoir's docstring\n\nAdcroft et al. (2019) describes OM4.0 broadly, not MOM6's tracer\nreservoir scheme specifically.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>\n\n* Subtype TracerReservoir as an AbstractRadiationScheme\n\nAddresses review comments from simone-silvestri: TracerReservoir's own\nmaterialize_radiation_storage/regularize_boundary_condition were identical\nto AbstractRadiationScheme's but for local variable names, existing only\nbecause TracerReservoir couldn't subtype AbstractRadiationScheme without\ndepending on #5962's refactor. #5962 has since merged.\n\nDoing this required generalizing the shared storage plumbing first, not\njust adding the supertype: the previous materialize_radiation_storage\nhardcoded NormalRadiation's exact layout (outflow_timescale,\ninflow_timescale, use_boundary_velocity, three buffers), which\nTracerReservoir doesn't have (two scalars, two buffers, no\nprevious-interior value -- it has no Orlanski phase-speed diagnosis to\nfeed). radiation_buffers/radiation_storage now let each concrete scheme\ndeclare its own full storage layout and rebuild itself from it;\nNormalRadiation uses the default (three buffers via getnamewrapper,\nunchanged behavior), ObliqueRadiation and TracerReservoir override both.\n\nTracerReservoir's own regularize_boundary_condition/\nmaterialize_radiation_storage are gone -- it now reuses\nAbstractRadiationScheme's directly.\n\nTried and dropped: an explicit error for the (nonsensical)\nNormalFlowBoundaryCondition(...; scheme=TracerReservoir()) case, since\nTracerReservoir is documented as Value-only. It was ambiguous with the\ntripolar-grid regularize_boundary_condition tie-breakers in\nOrthogonalSphericalShellGrids -- the same category of ambiguity #5962/#5964\nalready fixed for their own methods -- and fixing it meant touching files\noutside this scheme for an error message on a misuse nothing here\ndocuments or tests. Left as an ordinary MethodError; see the comment where\nit was removed.\n\nVerified: all 13 tests in test_open_boundary_conditions_hydrostatic.jl\npass (NormalRadiation, ObliqueRadiation and TracerReservoir alike).\ndetect_ambiguities(Oceananigans; recursive=true) is unchanged at 181,\nmatching the pre-change count exactly (confirmed against both the\npre-refactor commit and this one, side by side).\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>\n\n* Restraint pass: drop history-narrating comments, reuse zeros(arch, FT, N...)\n\nRemoved the two comments that narrated design history and a rejected\nalternative rather than describing the code they sit on, and the one that\nrestated what regularize_boundary_condition already reads as. Replaced the\nzero_buffer helper with the existing zeros(arch::AbstractArchitecture, FT,\nN...) from src/Grids/zeros_and_ones.jl, dropping the redundant\non_architecture wrapping it duplicated.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>\n\n* Tighten the reservoir anchor comment\n\nEvery stage relaxes from the same frozen anchor with its own Δt, not\njust later stages as the previous wording implied.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Opus 5 <noreply@anthropic.com>",
+          "timestamp": "2026-09-21T19:19:24Z",
+          "url": "https://github.com/CliMA/Oceananigans.jl/commit/1e6c09de4d89d1b5ccbd622ead341b2d5c152b19"
+        },
+        "date": 1790317454744,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Default/tripolar 360x180x50 F64/NVIDIA TITAN V/default",
+            "value": 0.05610060432,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gu_",
+            "value": 2.405873,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gv_",
+            "value": 2.299761,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__rk_substep_turbulent_kinetic_energy_",
+            "value": 1.997459,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_CATKE_closure_fields_",
+            "value": 1.4669665,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.94457,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.940347,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.938426,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_w_from_continuity_",
+            "value": 0.32019,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_broadcast_kernel_cartesian",
+            "value": 0.130239,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_TKE_diffusivity_",
+            "value": 0.596284,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/180x90x50",
+            "value": 0.01690591317,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/720x360x50",
+            "value": 0.21544845398,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F32",
+            "value": 0.046164757310000006,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/nothing",
+            "value": 0.032365972709999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+Biharmonic",
+            "value": 0.08098803644000001,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+GM+Biharmonic",
+            "value": 0.2500209388,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/nothing+nothing",
+            "value": 0.03772417597,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant5+WENO5",
+            "value": 0.05066528797,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant9+WENO9",
+            "value": 0.07406473889,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon_zstar",
+            "value": 0.06916496806,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon_zstar",
+            "value": 0.0645050576,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar_zstar",
+            "value": 0.06289128847,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon",
+            "value": 0.056811994649999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon",
+            "value": 0.05785849415,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/3 tracers",
+            "value": 0.060026345689999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/360x180x50",
+            "value": 0.05610060432,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F64",
+            "value": 0.05610060432,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE",
+            "value": 0.05610060432,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariantDefault+WENO7",
+            "value": 0.05610060432,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar",
+            "value": 0.05610060432,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
+            "value": 0.05610060432,
             "unit": "s/timestep"
           }
         ]
