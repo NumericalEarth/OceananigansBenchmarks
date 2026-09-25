@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790304602876,
+  "lastUpdate": 1790307168359,
   "repoUrl": "https://github.com/CliMA/Oceananigans.jl",
   "entries": {
     "Oceananigans.jl Benchmarks": [
@@ -58239,6 +58239,188 @@ window.BENCHMARK_DATA = {
           {
             "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
             "value": 0.05607479821,
+            "unit": "s/timestep"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Mosè Giordano",
+            "username": "giordano",
+            "email": "765740+giordano@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "d53ffc8e423a5cf7434b915e968ed99a7d63baf0",
+          "message": "Run the test suite with ParallelTestRunner (#6035)\n\n* Run the test suite with ParallelTestRunner\n\n`test/runtests.jl` used to include every file of a `TEST_GROUP` into\n`Main`, serially, inside one `CUDA.allowscalar() do` block. Each CI job\nran on a single core, files shared one namespace (a dozen helper names\nwere defined twice and eleven files relied on `using`s and `archs`\nleaking from earlier files), and selecting a single file went through\n`TEST_FILE`.\n\nParallelTestRunner runs each file on a pool of worker processes in a\nfresh module, with `--jobs`, `--verbose`, `--list`, `--quickfail`,\npositional prefix filters and failed/slow-first scheduling.\n\n- Test files move to `test/<group>/<name>.jl` so `find_tests` discovers\n  them and a group is a name prefix; the numbered splits\n  (`time_stepping_1/2/3`, ...) merge because a group's files now run in\n  parallel. Helpers live in `test/setup/` and are never tests.\n- Every test file includes `setup/dependencies_for_runtests.jl` with an\n  absolute `joinpath(@__DIR__, ...)` path and is runnable on its own;\n  the prelude is evaluated once per test module, so the\n  `@include_once` guard goes away. Files that used to rely on leaked\n  globals gain the include (and `set_field_interpolation.jl` the\n  `interpolate!` import it took from `field.jl`).\n- The prelude switches scalar indexing on process-wide, since workers\n  run each test in a fresh task, and moves each test module into its\n  own temporary directory so fixed-name output files cannot collide\n  between workers. Paths that were relative to the working directory\n  (`VALIDATION_DIR`, `run_sharding_tests.jl`, `run_script`) become\n  absolute.\n- The four writer files included from `output_writers.jl` become\n  separate tests; `init` becomes a test listed as `serial` so it runs\n  alone before everything else; tests that mutate process-global state\n  (Enzyme, sharding, convergence, Metal, oneAPI) get a throw-away\n  worker, and `FloatType` overrides are restored in `finally` blocks.\n- Distributed 4-rank tests stay outside `runtests()`: with\n  `MPI_TEST=true` the ranks execute `setup/run_mpi_tests.jl`, which\n  keeps the old group names and runs the files in-process and in\n  lockstep, so the distributed pipeline is unchanged.\n- The unused `interior(a, grid)` and `datatuple` overrides of\n  Oceananigans methods are dropped; the latter was shadowed by the more\n  specific `NamedTuple` method anyway.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01TNK7qXSraxSfzK6T4UxUtk\n\n* Point CI and docs at the ParallelTestRunner test groups\n\nGroups are now directories under `test/`, so the Buildkite matrix lists\nthe merged directory names and the GitHub workflow selects tests by\nprefix. The non-sharded Reactant jobs fold into one job because their\nfiles run in parallel on the runner; the Buildkite Enzyme/Reactant step\nstays separate since it needs a different Julia version. `--verbose`\nstreams per-test start/finish lines, otherwise worker output is only\nreplayed at the end. Developer docs and skills describe the new\n`Pkg.test(; test_args=[\"group/name\"])` selection.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01TNK7qXSraxSfzK6T4UxUtk\n\n* Drop words from test file names that the group directory already states\n\nA test is addressed as `group/name`, so `hydrostatic_free_surface/\nhydrostatic_free_surface_models` or `general_solvers/krylov_solver`\nsay the same thing twice. Rename 35 files so each `group/name` reads\nonce: the group's own words go, and so do suffixes the group implies\n(`_solver` under `general_solvers/`, `zstar_` under\n`vertical_coordinate/`). Single-file groups keep the repeated name\nbecause renaming the directory would change the `TEST_GROUP` values\nCI selects with.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01TNK7qXSraxSfzK6T4UxUtk\n\n* Aggregate jobs on Buildkite\n\n* Ignore versioned manifests\n\n* Cap number of ParallelTestRunner jobs\n\nEventually this value will be larger, for the time being we keep it very low to\navoid oversubscribing the machine.\n\n* Fix `Pkg.test` syntax\n\n* Give memory allocations test a worker without code coverage\n\n* Git Reactant some colour\n\n* Decrease earlyoom report frequency\n\n* Reduce max RSS to 10 GB for now\n\n* Don't use Buildkite retry\n\n* Build regression data filenames from bare type names\n\nThe hydrostatic and large-eddy regression tests derived the name of the\nDataDeps reference file from `string(typeof(x).name.wrapper)` and from\nthe topology type, which print module-qualified unless the type is\nvisible from `Main`. In a ParallelTestRunner module that yields\n\"..._Oceananigans.Grids.Periodic_...\" and DataDeps falls back to an\ninteractive prompt that fails on a worker.\n\nThe Rayleigh–Bénard test also used the two-argument `interior(a, grid)`\nthat the prelude used to pirate onto `Oceananigans.Fields.interior`;\nit gets a local `strip_halos` instead.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01TNK7qXSraxSfzK6T4UxUtk\n\n* Fold all Reactant and Makie tests together\n\n* [CI] Simply run instantiate during init step\n\n* [CI] Fold two MPI tests into a single job\n\n* Increase stack size for Enzyme autodiff\n\n* Add concurrency group\n\n* Move docs build after long-running tests for better load balancing\n\n* Run tests with `--quickfail`\n\n* Tweak number of concurrent jobs\n\n* Pass `history_key` to `runtests` to separate history of GPU tests from CPU ones\n\n---------\n\nCo-authored-by: Claude Fable 5.1 <noreply@anthropic.com>",
+          "timestamp": "2026-09-20T21:58:17Z",
+          "url": "https://github.com/CliMA/Oceananigans.jl/commit/d53ffc8e423a5cf7434b915e968ed99a7d63baf0"
+        },
+        "date": 1790307167784,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Default/tripolar 360x180x50 F64/NVIDIA TITAN V/default",
+            "value": 0.056087959209999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gu_",
+            "value": 2.401747,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gv_",
+            "value": 2.2973325,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__rk_substep_turbulent_kinetic_energy_",
+            "value": 1.997078,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_CATKE_closure_fields_",
+            "value": 1.4694325,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.944379,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.939579,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.939483,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_w_from_continuity_",
+            "value": 0.316799,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_broadcast_kernel_cartesian",
+            "value": 0.130143,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_TKE_diffusivity_",
+            "value": 0.594492,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/180x90x50",
+            "value": 0.01691453755,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/720x360x50",
+            "value": 0.21518211038,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F32",
+            "value": 0.0464648986,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/nothing",
+            "value": 0.03245289447,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+Biharmonic",
+            "value": 0.08094034388,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+GM+Biharmonic",
+            "value": 0.25061264658,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/nothing+nothing",
+            "value": 0.03777375301,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant5+WENO5",
+            "value": 0.050669568629999995,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant9+WENO9",
+            "value": 0.07407299429,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon_zstar",
+            "value": 0.06915660185,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon_zstar",
+            "value": 0.06446767561,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar_zstar",
+            "value": 0.06281946095,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon",
+            "value": 0.056786847419999995,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon",
+            "value": 0.05786962923,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/3 tracers",
+            "value": 0.06003621912,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/360x180x50",
+            "value": 0.056087959209999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F64",
+            "value": 0.056087959209999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE",
+            "value": 0.056087959209999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariantDefault+WENO7",
+            "value": 0.056087959209999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar",
+            "value": 0.056087959209999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
+            "value": 0.056087959209999996,
             "unit": "s/timestep"
           }
         ]
