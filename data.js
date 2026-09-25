@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790309722183,
+  "lastUpdate": 1790312296960,
   "repoUrl": "https://github.com/CliMA/Oceananigans.jl",
   "entries": {
     "Oceananigans.jl Benchmarks": [
@@ -58603,6 +58603,188 @@ window.BENCHMARK_DATA = {
           {
             "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
             "value": 0.05606609835,
+            "unit": "s/timestep"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Andreas Klocker",
+            "username": "aklocker42",
+            "email": "andreas.klocker@beyondthesump.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "e65440762b5192e761eba0f086696b7bdad7f84a",
+          "message": "Thread model.clock, fields(model) through set!/interpolate! halo fills (#5866)\n\n* Add `needs_simulation_context` trait to guard halo fills in `set!`/`interpolate!`\n\n`set_to_field!` and `interpolate!` unconditionally called `fill_halo_regions!`\non source/destination fields. When a field carries a `ContinuousBoundaryFunction`\nor `DiscreteBoundaryFunction` BC, that fill requires `clock` and `model_fields`\nthat are not available at this call site, producing a `MethodError` on CPU or\n`InvalidIRError` on GPU (triggered by any `set!` between fields of different size\nor location when the destination has function BCs — e.g. `NormalRadiation`).\n\nThe fix is a `needs_simulation_context` trait that returns `true` for these BC\ntypes. Both call sites skip the unconditional fill when the trait fires; the\nmodel's `update_state!` fills those halos on the first time step with the correct\ncontext. A test is added that exercises the `ContinuousBoundaryFunction` crash\npath and guards against regressions.\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\n\n* Fix needs_simulation_context regression for Open OBC fields\n\nOpen/NormalFlow BC fills are gated by fill_open_bcs=false so they can be\nsafely skipped without also skipping the distributed MPI exchange. The\nprevious dispatch `needs_simulation_context(c::Open) = needs_simulation_context(c.scheme)`\ncaused the guard to fire for Open{DiscreteBoundaryFunction} fields (e.g. GravityWave\nOBCs), suppressing the entire fill_halo_regions! call and leaving stale\ndistributed halos after set!/interpolate!.\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\n\n* Fix two more regressions in set_to_field! for distributed IBG fields\n\n1. needs_simulation_context(::OBC) = false — the BoundaryCondition-level\n   dispatch combines classification | condition, so Open{Nothing}+DBF\n   condition still returned true, incorrectly suppressing the distributed\n   MPI exchange for all OBC fields.\n\n2. Short-circuit on_architecture when child architectures already match.\n   Calling on_architecture(GPU(), v) where v is already on GPU triggers\n   a full ImmersedBoundaryGrid reconstruction via materialize_immersed_boundary,\n   which creates a fresh bottom_height field without MultiRegion connectivity\n   injected — fill_halo_regions! on that field then crashes with\n   \"type Nothing has no field rank\".\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\n\n* Fix OBC dispatch ordering and add needs_simulation_context tests\n\n- Move needs_simulation_context(::OBC) after the OBC type alias definition\n  (was causing UndefVarError on load)\n- Add @testset for needs_simulation_context dispatch covering CBF Flux,\n  Open+DBF, Open+Number, FieldBoundaryConditions variants\n- Fix CBF interpolation test: use explicit BCs on a Bounded topology grid\n  to avoid DefaultBoundaryCondition types that fill_halo_kernel doesn't handle\n\nAll 11 tests pass (CPU).\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\n\n* Fix plain NormalFlow BCs no longer being filled in interpolate!/set!\n\nfill_normal_flow_bcs=false was applied unconditionally to every NFBC,\nnot just ones whose condition actually needs clock/model_fields. That\nleft ~1e-8 floating-point residue at impenetrability boundaries (e.g.\nw=0) instead of the exact BC value, since main's unconditional fill\npreviously clamped it. Reproduced via test_field.jl's interpolate!\nround-trip test on CPU/Float32, which failed isapprox's relative\ntolerance near the zero boundary value.\n\nAdd normal_flow_needs_simulation_context, which checks each NFBC's own\ncondition rather than blanket-skipping, so plain impenetrability BCs\nare filled as before while genuinely context-needing Open BCs are\nstill skipped.\n\n* Add RNFBC kernel fallbacks to fix distributed GPU InvalidIRError\n\nOn distributed GPU, fill_halo_regions!(field) can be called without\nclock/model_fields during initialisation (e.g. during grid/model setup\nbefore the clock is available). For RNFBC fields the call chain reaches\n_fill_*_halo! with args=() — the exact-signature radiation methods don't\nmatch, the NFBC catch-all in fill_halo_regions_normal_flow.jl fires, and\ngetbc calls the DiscreteBoundaryFunction with missing args, causing an\nInvalidIRError: call to gpu_gc_pool_alloc when the GPU kernel is compiled.\n\nAdd variadic fallbacks for all six faces that return nothing when called\nwithout (clock, model_fields). They are more specific than the NFBC\ncatch-all (RNFBC ⊂ NFBC) so they intercept the bad dispatch, while the\nexact-signature radiation methods still win at time-stepping when the\nfull (loc::FAA, clock, model_fields) args are present.\n\nValidated on 4-GPU GH200 North Atlantic simulation (1×4 and 2×2\npartitions) — both previously crashed at first kernel compilation.\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\n\n* Add RNFBC tests: normal_flow_needs_simulation_context and clockless fill\n\nTests that:\n- needs_simulation_context returns false for RNFBC (NFBC catch-all)\n- normal_flow_needs_simulation_context returns true for RNFBC (DBF condition)\n- fill_halo_regions!(v) without clock does not crash on a field with RNFBC\n- set!(v, 0) does not crash on a field with RNFBC\n\nThe fill_halo_regions! and set! tests cover the bug fixed by the RNFBC\nkernel fallbacks added in the previous commit.\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\n\n* Style: collapse block comments to single lines, drop narrating inline comments\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\n\n* Remove needs_simulation_context guard; thread clock/model_fields through set!\n\nPer glwagner's review: rather than guarding halo fills with a\nneeds_simulation_context flag, pass model.clock and fields(model) into\nfill_halo_regions! so it actually has the context it needs.\n\nset!/set_to_field!/interpolate! now take optional clock/model_fields\narguments that flow through to fill_halo_regions!, populated from the\nmodel at both model-level set! call sites. The needs_simulation_context/\nnormal_flow_needs_simulation_context trait is removed entirely.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>\n\n* Ignore clock/model_fields in function-based set!\n\nModel-level set! now passes model.clock, fields(model) uniformly to\nevery set!(field, value, ...) call, including function-based initial\nconditions. This leaked the real clock into set_to_function!, which\nbuilt a FunctionField with a non-nothing clock and started calling\nuser functions as f(x, y, z, t) instead of f(x, y, z) — breaking every\n3-arg initial-condition function (e.g. set!(model, η=ηᵢ)).\n\nclock/model_fields are only meaningful for field-to-field set! (they\nthread through to fill_halo_regions!); the Function dispatch now\naccepts and ignores them.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>\n\n* Fix non-isbits closure in set! field interpolation test\n\nFluxBoundaryCondition((x, y, t) -> zero(FT)) captured the loop\nvariable FT (a Type) in the closure, making the resulting\nContinuousBoundaryFunction struct non-isbits. This only fails on\nGPU, where kernel compilation requires isbits arguments\n(InvalidIRError: passing non-bitstype argument, .func.FT not\nisbits). Use zero(x) instead --- x is already FT-typed when the\ncallback runs, so no need to capture the type.\n\n* Use generic args... instead of clock/model_fields in set!/interpolate!\n\nPer review: different models pass different args into fill_halo_regions!\n(only ocean-like models pass clock, fields); args... is generic and\nfuture-proof, and matches the existing fill_halo_regions! convention.\n\n* Update src/BoundaryConditions/boundary_condition_classifications.jl\n\nCo-authored-by: Simone Silvestri <silvestri.simone0@gmail.com>\n\n* Update src/BoundaryConditions/boundary_condition.jl\n\nCo-authored-by: Simone Silvestri <silvestri.simone0@gmail.com>\n\n* Update src/Fields/set!.jl\n\nCo-authored-by: Simone Silvestri <silvestri.simone0@gmail.com>\n\n---------\n\nCo-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>\nCo-authored-by: Simone Silvestri <silvestri.simone0@gmail.com>\nCo-authored-by: Mosè Giordano <mose@gnu.org>",
+          "timestamp": "2026-09-21T12:40:52Z",
+          "url": "https://github.com/CliMA/Oceananigans.jl/commit/e65440762b5192e761eba0f086696b7bdad7f84a"
+        },
+        "date": 1790312296380,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Default/tripolar 360x180x50 F64/NVIDIA TITAN V/default",
+            "value": 0.056057831929999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gu_",
+            "value": 2.399798,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gv_",
+            "value": 2.296022,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__rk_substep_turbulent_kinetic_energy_",
+            "value": 1.994904,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_CATKE_closure_fields_",
+            "value": 1.470362,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.943996,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.939228,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.939196,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_w_from_continuity_",
+            "value": 0.317343,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_broadcast_kernel_cartesian",
+            "value": 0.130079,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_TKE_diffusivity_",
+            "value": 0.594781,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/180x90x50",
+            "value": 0.01691555032,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/720x360x50",
+            "value": 0.21513517809,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F32",
+            "value": 0.043780075849999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/nothing",
+            "value": 0.03238709294,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+Biharmonic",
+            "value": 0.08084738482,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+GM+Biharmonic",
+            "value": 0.25001442227,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/nothing+nothing",
+            "value": 0.0377953005,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant5+WENO5",
+            "value": 0.05068061964,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant9+WENO9",
+            "value": 0.07414577431,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon_zstar",
+            "value": 0.06915572479,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon_zstar",
+            "value": 0.06449975968999999,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar_zstar",
+            "value": 0.06283928635,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon",
+            "value": 0.05679466758,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon",
+            "value": 0.057885928350000004,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/3 tracers",
+            "value": 0.060041233539999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/360x180x50",
+            "value": 0.056057831929999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F64",
+            "value": 0.056057831929999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE",
+            "value": 0.056057831929999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariantDefault+WENO7",
+            "value": 0.056057831929999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar",
+            "value": 0.056057831929999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
+            "value": 0.056057831929999996,
             "unit": "s/timestep"
           }
         ]
