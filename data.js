@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790302086672,
+  "lastUpdate": 1790304602876,
   "repoUrl": "https://github.com/CliMA/Oceananigans.jl",
   "entries": {
     "Oceananigans.jl Benchmarks": [
@@ -58057,6 +58057,188 @@ window.BENCHMARK_DATA = {
           {
             "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
             "value": 0.05606200908,
+            "unit": "s/timestep"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Tomás Chor",
+            "username": "tomchor",
+            "email": "tomaschor@gmail.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "6df4d686dbb0a71d7e5f5264d865086c629a657a",
+          "message": "Add `target_transport` to `NormalRadiation`, `ObliqueRadiation` and `GravityWaveRadiation` (#5969)\n\n* Add `target_transport` to `NormalRadiation`\n\nBrings `NormalRadiation` in line with `PerturbationAdvection`: a\n`NormalFlowBoundaryCondition` with `NormalRadiation(; target_transport = Q)`\nhas its net transport pinned to `Q` through the existing\n`has_target_transport` / `get_target_transport` interface. The keyword\nconversion shared by both schemes moves to `convert_target_transport`.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01MiETBej9JiYMCiDbKx1xbe\n\n* Add `target_transport` to `GravityWaveRadiation`\n\nThe Flather condition on the barotropic transports gains a `target_transport`\nkeyword, with the same `has_target_transport` / `get_target_transport`\ninterface as the other open boundary schemes. After the Flather fill of every\nbarotropic substep, and after the end-of-step refills of the barotropic and\nfiltered transports, a targeted face is shifted uniformly so that its\ntransport `∮U·dl` matches the target: the free surface sees exactly the\nprescribed transport and only the shape of the Flather profile survives.\nWithout a target nothing changes.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01MiETBej9JiYMCiDbKx1xbe\n\n* add validation scripts for nonhydrostatic and hydrostatic models\n\n* Add `target_transport` to `ObliqueRadiation`\n\nSame trailing `target_transport` field and trait methods as `NormalRadiation`.\nWith both radiation schemes carrying it, `show` and the storage materialization\nof `AbstractRadiationScheme` handle the target generically. The targeted\ntransport tests and the nonhydrostatic validation script, which now writes one\nfigure per scheme, cover `PerturbationAdvection`, `NormalRadiation` and\n`ObliqueRadiation`.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01MiETBej9JiYMCiDbKx1xbe\n\n* Address review of the Flather target pin\n\nRead the side conditions through a helper that yields `nothing` for anything\nbut a `FieldBoundaryConditions`, so multi-region split-explicit runs pass\nthrough the end-of-step pin untouched, and refuse targets on multi-region and\ndistributed grids at construction, since the face integral is region- and\nrank-local. Fold the face shift into the single-work-item reduction kernel:\none launch and no scratch buffer. Test pinned, balanced, unbalanced and\n`nothing` Flather targets on a split-explicit model. Fix the validation\nscript's file references and add the diagonal-flow script it cites.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01MiETBej9JiYMCiDbKx1xbe\n\n* Validate Flather targets globally, weight wet columns, and pin in one workgroup\n\nTargets on `GravityWaveRadiation` conditions are now checked on the boundary conditions the user passes to `HydrostaticFreeSurfaceModel`, through a new `validate_free_surface_boundary_conditions` hook, so every rank of a distributed grid reaches the same verdict; multi-region grids refuse them through a method in `MultiRegion`. The face integral and the shift skip dry columns of immersed grids, and the pin kernel runs as a single workgroup with a strided reduction through local memory instead of one serial work item. Tests cover the immersed face and the multi-region rejection.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01MiETBej9JiYMCiDbKx1xbe\n\n* Pin Flather targets with reduced fields instead of shared memory\n\nThe face integral behind a `target_transport` on a `GravityWaveRadiation` boundary is now a reduced `Field(Integral(view(U, ...)))` per targeted side, computed with `compute!` every substep like the transports in `Models.boundary_transport`, and the face is shifted by an ordinary `launch!`-ed kernel that reads the integral on the device. This replaces the single-workgroup kernel with `@localmem` and `@synchronize` and its direct KernelAbstractions launch. `SplitExplicitFreeSurface` gains a `boundary_transport` slot holding, for each targeted side, the target, the wet length of the face and the reduced fields for `U`/`V` and for `Ũ`/`Ṽ`; it is `nothing` when no side is targeted, and a fully dry side stays untargeted. Reductions on immersed grids skip dry columns, so the wet weighting comes for free.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01MiETBej9JiYMCiDbKx1xbe\n\n* Use the existing `GWNFBC` alias instead of a new `FlatherBC`\n\n`BoundaryConditions` already aliases `BoundaryCondition{<:NormalFlow{<:GravityWaveRadiation}}` as `GWNFBC`, so the split-explicit module imports that instead of defining a duplicate under a person's name.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01MiETBej9JiYMCiDbKx1xbe\n\n* shorten comments\n\n* Move the targeted barotropic transport code to its own file\n\nThe block that pins Flather faces to their `target_transport` moves from `step_split_explicit_free_surface.jl` to `barotropic_targeted_transport.jl`, included just before the step file, leaving only the two call sites behind.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01MiETBej9JiYMCiDbKx1xbe\n\n* Update src/Models/HydrostaticFreeSurfaceModels/SplitExplicitFreeSurfaces/barotropic_targeted_transport.jl\n\nCo-authored-by: Simone Silvestri <silvestri.simone0@gmail.com>\n\n* Apply batched suggestions from code review\n\nCo-authored-by: Simone Silvestri <silvestri.simone0@gmail.com>\n\n* use existing method\n\n* Pin targeted Flather faces with one pre-configured kernel per substep\n\nReplace the `Integral` field plus unconfigured pin launch (a `fill!`, a\n`mapreducedim!` with per-call argument conversion and a `launch!` per\ntargeted side per substep) with a single fused kernel: one static\nworkgroup integrates the face over its wet columns through local memory\nand shifts it uniformly onto the target. The kernel is built once per\nbarotropic step with `StaticSize` and its arguments are converted to the\ndevice outside the substep loop, like the other substep kernels, so each\ntargeted side costs one launch per substep with no allocation.\n`boundary_transport` now holds only the targets of the four sides.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Fable 5.1 <noreply@anthropic.com>\nCo-authored-by: Simone Silvestri <silvestri.simone0@gmail.com>",
+          "timestamp": "2026-09-20T16:34:41Z",
+          "url": "https://github.com/CliMA/Oceananigans.jl/commit/6df4d686dbb0a71d7e5f5264d865086c629a657a"
+        },
+        "date": 1790304602563,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Default/tripolar 360x180x50 F64/NVIDIA TITAN V/default",
+            "value": 0.05607479821,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gu_",
+            "value": 2.3990255,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gv_",
+            "value": 2.2958265,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__rk_substep_turbulent_kinetic_energy_",
+            "value": 1.995347,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_CATKE_closure_fields_",
+            "value": 1.469176,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.944219,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.939675,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.938811,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_w_from_continuity_",
+            "value": 0.317854,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_broadcast_kernel_cartesian",
+            "value": 0.130079,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_TKE_diffusivity_",
+            "value": 0.594364,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/180x90x50",
+            "value": 0.0169175329,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/720x360x50",
+            "value": 0.21518664665999998,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F32",
+            "value": 0.04378700639,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/nothing",
+            "value": 0.03238817569,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+Biharmonic",
+            "value": 0.08084883145999999,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+GM+Biharmonic",
+            "value": 0.25019315776,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/nothing+nothing",
+            "value": 0.03777023749,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant5+WENO5",
+            "value": 0.0506533475,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant9+WENO9",
+            "value": 0.07412558107,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon_zstar",
+            "value": 0.06915817056,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon_zstar",
+            "value": 0.06447625587,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar_zstar",
+            "value": 0.06284383355,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon",
+            "value": 0.05680858411,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon",
+            "value": 0.05785595603,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/3 tracers",
+            "value": 0.06004647489,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/360x180x50",
+            "value": 0.05607479821,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F64",
+            "value": 0.05607479821,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE",
+            "value": 0.05607479821,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariantDefault+WENO7",
+            "value": 0.05607479821,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar",
+            "value": 0.05607479821,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
+            "value": 0.05607479821,
             "unit": "s/timestep"
           }
         ]
