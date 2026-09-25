@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790354455974,
+  "lastUpdate": 1790359550683,
   "repoUrl": "https://github.com/CliMA/Oceananigans.jl",
   "entries": {
     "Oceananigans.jl Benchmarks": [
@@ -61333,6 +61333,188 @@ window.BENCHMARK_DATA = {
           {
             "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
             "value": 0.05606966331,
+            "unit": "s/timestep"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Gregory L. Wagner",
+            "username": "glwagner",
+            "email": "wagner.greg@gmail.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "32571e5c28f0954ef0b790662623a172e38db6f8",
+          "message": "Add a single column parameter estimation example with Reactant and Enzyme (#5013)\n\n* update AGENTS\n\n* add state estimation example\n\n* fix irregularity in reactant set\n\n* update example\n\n* it runs!\n\n* add cost function\n\n* add to examples\n\n* fix bugs\n\n* gradient fails\n\n* Update single_column_state_estimation.jl\n\n* add enzyme and reactant to docs project\n\n* fix constructor\n\n* keep fixing constructor\n\n* make update state for single columns similar to big model update state\n\n* use traced if\n\n* Refactor boundary mass fluxes with dispatch-based boundary types\n\nReplaces NamedTuple-based boundary mass flux tracking with structured\nBoundaryMassFlux and BoundaryMassFluxes types using boundary location\ntypes (WestBoundary, EastBoundary, etc.) for cleaner dispatch.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\n\n* Use a constant Δt in the state estimation example\n\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>\n\n* Rewrite the single column example as a parameter estimation twin experiment\n\n- Rename examples/single_column_state_estimation.jl to\n  single_column_parameter_estimation.jl and recover the k-ϵ stability function\n  constants Cu₀ and Cc₀ of a nature run by gradient descent, with gradients from\n  Enzyme compiled by Reactant.\n- Call step_closure_prognostics! in the Reactant QuasiAdamsBashforth2 time_step!,\n  so that TKE-based closures evolve their prognostic variables under Reactant.\n- Add Adapt rules for TKEDissipationVerticalDiffusivity and its parameter structs,\n  so that closure parameters can be traced (and differentiated) by Reactant.\n- Add a regression test that e and ϵ evolve under Reactant.\n\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>\n\n* Animate BFGS iterations in the parameter estimation example\n\n- Differentiate through the dependence of 𝕊u₀ on Cu₀ with the chain rule,\n  rather than holding 𝕊u₀ fixed.\n- Use BFGS steps with a backtracking line search, which converge in the\n  narrow valley of the cost function where plain gradient descent zig-zags.\n- Plot buoyancy anomalies and animate the profiles, parameter path and\n  cost over the iterations.\n\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>\n\n* Jointly estimate closure parameters and surface fluxes in the single column example\n\n- Assign parameters to the model inside the differentiated cost function,\n  building the closure from traced numbers so that Enzyme differentiates\n  through the VariableStabilityFunctions constructor (including 𝕊u₀).\n- Reuse a single model, zeroing its state before each run.\n- Estimate Cu₀, Cc₀, the wind stress and the buoyancy flux of a wind-driven,\n  cooled column from a distant initial guess with BFGS.\n- Animate the parameters, cost and profiles over the iterations.\n\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>\n\n* Fix reset! for models with ZeroFields, such as single column models\n\nreset! filled every model field with zero, which errors on the ZeroField\nvertical velocity of single column models. Skip ZeroFields, add a test,\nand use reset! in the parameter estimation example (now 10 BFGS iterations).\n\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>\n\n* Reset closure state in reset! and use Optim.jl in the parameter estimation example\n\n- Add reset!(closure_fields, closure), which zeros the state that CATKE and\n  TKEDissipationVerticalDiffusivity carry between time steps, and call it\n  from reset!(model).\n- Test reset! for single column models with and without TKE closures, and\n  use field reductions in the tests.\n- Minimize the cost with Optim.jl's BFGS rather than a hand-written BFGS,\n  and add Optim to the docs environment.\n- Rename the cost to 𝒥 and the parameters to normalized_parameters / θ.\n\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>\n\n* Use set! and field operations in the parameter estimation example\n\n- Copy the observations with set! and write the cost with AbstractOperations,\n  which gives bit-identical costs and gradients to indexing interiors.\n- Fix the animation's axis limits to contain the profiles at every iteration.\n\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>\n\n* Compare BFGS with gradient descent in the parameter estimation example\n\nReuse the compiled cost and gradient to repeat the optimization with Optim's\nGradientDescent, and report costs, evaluation counts and timings for both.\n\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>\n\n* Use Reactant's IFRT runtime in the docs, as in the tests\n\nSet the xla_runtime preference in docs/Project.toml to match test/Project.toml,\nand explain in the parameter estimation example how to choose the runtime.\n\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>\n\n* Run the parameter estimation example on Reactant's CPU backend\n\nOn the documentation's GPU the compiled cost returned a one-element array\nrather than a number, and a single column gains nothing from a GPU.\n\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>\n\n* Extract reductions to a number with Cartesian indexing\n\nWith Reactant on Julia 1.13, linear indexing into a view of a traced array\nreturns a one-element array rather than a number, so reductions such as\nsum(field) and mean(field) returned arrays under Reactant. Index the reduced\nfield's interior with [1, 1, 1] instead of using first, and test that compiled\nreductions return numbers.\n\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>\n\n* Avoid a soft-scope warning in the parameter estimation example\n\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>\n\n* Retrigger CI: GPU conjugate gradient test hung\n\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>\n\n* Build the parameter estimation example first in the docs\n\nIt is the slowest example, so starting it first lets it run alongside the others.\n\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>\n\n* Use 32 vertical levels in the parameter estimation example\n\nCompiling the gradient takes about 7x less time with 32 levels than with 64,\nand the parameter estimates are about as good.\n\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-09-25T04:50:12Z",
+          "url": "https://github.com/CliMA/Oceananigans.jl/commit/32571e5c28f0954ef0b790662623a172e38db6f8"
+        },
+        "date": 1790359550303,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Default/tripolar 360x180x50 F64/NVIDIA TITAN V/default",
+            "value": 0.05605219182,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gu_",
+            "value": 2.405523,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gv_",
+            "value": 2.299795,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__rk_substep_turbulent_kinetic_energy_",
+            "value": 1.997492,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_CATKE_closure_fields_",
+            "value": 1.466872,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.944315,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.940315,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.937627,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_w_from_continuity_",
+            "value": 0.320191,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_broadcast_kernel_cartesian",
+            "value": 0.130207,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_TKE_diffusivity_",
+            "value": 0.596796,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/180x90x50",
+            "value": 0.01689882141,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/720x360x50",
+            "value": 0.21546903536999998,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F32",
+            "value": 0.04379365226,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/nothing",
+            "value": 0.03236140578,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+Biharmonic",
+            "value": 0.08080859117,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+GM+Biharmonic",
+            "value": 0.25033211184,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/nothing+nothing",
+            "value": 0.03768523283,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant5+WENO5",
+            "value": 0.050677575069999994,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant9+WENO9",
+            "value": 0.07402391548,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon_zstar",
+            "value": 0.06914678917,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon_zstar",
+            "value": 0.06504407522,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar_zstar",
+            "value": 0.06282455964,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon",
+            "value": 0.05668953571,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon",
+            "value": 0.05779649076,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/3 tracers",
+            "value": 0.060013975879999994,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/360x180x50",
+            "value": 0.05605219182,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F64",
+            "value": 0.05605219182,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE",
+            "value": 0.05605219182,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariantDefault+WENO7",
+            "value": 0.05605219182,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar",
+            "value": 0.05605219182,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
+            "value": 0.05605219182,
             "unit": "s/timestep"
           }
         ]
