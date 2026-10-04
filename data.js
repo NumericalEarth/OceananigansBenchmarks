@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791122506814,
+  "lastUpdate": 1791143767115,
   "repoUrl": "https://github.com/CliMA/Oceananigans.jl",
   "entries": {
     "Oceananigans.jl Benchmarks": [
@@ -67566,6 +67566,213 @@ window.BENCHMARK_DATA = {
           {
             "name": "Distributed/tripolar 360x180x50 F64/NVIDIA TITAN V/1x1x1",
             "value": 0.055931322760000006,
+            "unit": "s/timestep"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Ali Ramadhan",
+            "username": "ali-ramadhan",
+            "email": "ali.hh.ramadhan@gmail.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "eaf58a6ff964517b3587735526918271aae266f1",
+          "message": "Keep the conjugate-gradient scalars on the GPU (#6086)\n\n* Keep the conjugate-gradient scalars on the device\n\nConjugateGradientSolver computed ρ = z ⋅ r and α = ρ / (p ⋅ q) with `dot`,\nwhich copies each result to the host, so every iteration made the host wait\nfor the device three times, counting the convergence test (nine times for\nConjugateGradientPoissonSolver on an ImmersedBoundaryGrid). The scalars now\nlive in one-element arrays on the solver's architecture, and only the\nconvergence test copies a number, |r|, to the host.\n\n- Add `Fields.dot!`, an in-place dot product; `LinearAlgebra.dot` calls it.\n  Distributed and multi-region grids reduce through the existing `dot`.\n- Store ρ, ρⁱ⁻¹, pᵀq, α, and β in one-element arrays, compute α and β with\n  one-element broadcasts, and swap ρ and ρⁱ⁻¹ rather than copying.\n- Replace `enforce_zero_mean_gauge!` with `ZeroMeanGaugeCondition(grid)`,\n  which computes the means in place and counts the active cells once.\n- Check `===` before `==` in `validate_grid`, so that building `a * b` on an\n  immersed grid no longer compares bottom heights on the device.\n- Fix the pseudocode in the `solve!` docstring.\n\nSolutions and iteration counts are bit-for-bit identical to main on a V100.\n\nCloses #6079\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Import `dot` and `norm` in the file that uses them for KrylovSolver\n\nkrylov_solver.jl calls `dot` and `norm` but imported neither: it relied on\n`using LinearAlgebra: norm, dot` in conjugate_gradient_solver.jl, which is in\nthe same module. The previous commit dropped `dot` from that import because the\nconjugate-gradient solver no longer calls it, so `Krylov.kdot` threw an\n`UndefVarError` at run time.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Extend `dot!` with qualified method definitions instead of `import`\n\nThe distributed method is now defined as `Fields.dot!(...)`, so it is clear\nwhere the method is defined that it extends `Oceananigans.Fields.dot!`, and\n`dot!` is no longer added to the `import` list. `multi_region_reductions.jl`\nnow brings `Fields` into scope itself for its `Fields.dot!` method, instead of\nrelying on another file of `MultiRegion` to do so.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Add nonhydrostatic pressure-solver benchmarks\n\nAdds a `nonhydrostatic` case to the benchmark suite (`--case=nonhydrostatic`):\na stratified, rotating current in a 1 km × 1 km × 500 m box that is periodic in\nx and y, with `WENO(order=5)` advection. `--pressure_solver` picks the grid, and\nwith it the pressure solver:\n\n- `FFT`: a uniform `RectilinearGrid`, with the `FFTBasedPoissonSolver`;\n- `FourierTridiagonal`: a `RectilinearGrid` stretched in z, with the\n  `FourierTridiagonalPoissonSolver`;\n- `ConjugateGradient`: an `ImmersedBoundaryGrid` with a seamount, with the\n  `ConjugateGradientPoissonSolver`.\n\nThe benchmark pipeline runs all three at 64³ on GPU 2, as the\n\"Nonhydrostatic Pressure Solver Sweep\" group.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Remove noisy `@info`\n\n* Fix test\n\n* Add `condition` keyword to MultiRegion `dot!` method\n\n* Remove extra `]`\n\n* Build the distributed `dot` on the generic `dot!`\n\nThe distributed `dot` duplicated the `condition_operand` → product →\n`mapreducedim!` body of the generic `dot!`. Move that body into\n`local_dot!`, have the distributed `dot!` call it before the all-reduce,\nand drop the distributed `dot`: the generic `LinearAlgebra.dot` is already\n`dot!` followed by reading the one-element result, so it now reduces across\nranks through the distributed `dot!`.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01R9xtfXmaBLbsXwWHV4HgZD\n\n* Read `dot!` results in tests with `Array` instead of `@allowscalar`\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01R9xtfXmaBLbsXwWHV4HgZD\n\n* Apply the zero-mean gauge condition with one kernel launch\n\nThe gauge condition ran two `sum!` reductions, two one-element divisions,\nand two full-grid kernels per iteration. The kernel now subtracts both\nmeans and masks both fields in one launch, dividing the device sums by the\nnumber of active cells itself, so the gauge costs two reductions and one\nkernel per iteration.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01R9xtfXmaBLbsXwWHV4HgZD\n\n* Simplify regional `dot`\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>\nCo-authored-by: Mosè Giordano <765740+giordano@users.noreply.github.com>",
+          "timestamp": "2026-10-04T19:08:45Z",
+          "url": "https://github.com/CliMA/Oceananigans.jl/commit/eaf58a6ff964517b3587735526918271aae266f1"
+        },
+        "date": 1791143766619,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Default/tripolar 360x180x50 F64/NVIDIA TITAN V/default",
+            "value": 0.055917389389999995,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gu_",
+            "value": 2.404719,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gv_",
+            "value": 2.3001765,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__rk_substep_turbulent_kinetic_energy_",
+            "value": 1.994163,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_CATKE_closure_fields_",
+            "value": 1.47207,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.943289,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.939321,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.936889,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_w_from_continuity_",
+            "value": 0.318173,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_TKE_diffusivity_",
+            "value": 0.595132,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_split_explicit_transport_velocities_",
+            "value": 0.452765,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/180x90x50",
+            "value": 0.01671326615,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/720x360x50",
+            "value": 0.21496087312,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F32",
+            "value": 0.03257288683,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/nothing",
+            "value": 0.03245219498,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+Biharmonic",
+            "value": 0.08074549847,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+GM+Biharmonic",
+            "value": 0.25021404226,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/nothing+nothing",
+            "value": 0.03764725198,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant5+WENO5",
+            "value": 0.050551948060000004,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant9+WENO9",
+            "value": 0.07404008878,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon_zstar",
+            "value": 0.0686671531,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon_zstar",
+            "value": 0.06448170139,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar_zstar",
+            "value": 0.06324282435,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon",
+            "value": 0.05637516911,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon",
+            "value": 0.05719677536,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/3 tracers",
+            "value": 0.05985900664,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Nonhydrostatic Pressure Solver Sweep/Nonhydrostatic_FFT_64x64x64_F64_WENO5/NVIDIA TITAN V/64x64x64",
+            "value": 0.0026187554600000003,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Nonhydrostatic Pressure Solver Sweep/Nonhydrostatic_FourierTridiagonal_64x64x64_F64_WENO5/NVIDIA TITAN V/64x64x64",
+            "value": 0.0032690399999999995,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Nonhydrostatic Pressure Solver Sweep/Nonhydrostatic_ConjugateGradient_64x64x64_F64_WENO5/NVIDIA TITAN V/64x64x64",
+            "value": 0.020594018470000003,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Distributed/tripolar 360x180x50 F64/NVIDIA TITAN V/1x2x1",
+            "value": 0.04863450555,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/360x180x50",
+            "value": 0.055917389389999995,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F64",
+            "value": 0.055917389389999995,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE",
+            "value": 0.055917389389999995,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariantDefault+WENO7",
+            "value": 0.055917389389999995,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar",
+            "value": 0.055917389389999995,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
+            "value": 0.055917389389999995,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Distributed/tripolar 360x180x50 F64/NVIDIA TITAN V/1x1x1",
+            "value": 0.055917389389999995,
             "unit": "s/timestep"
           }
         ]
