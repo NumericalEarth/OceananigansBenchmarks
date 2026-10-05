@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791213681108,
+  "lastUpdate": 1791236644224,
   "repoUrl": "https://github.com/CliMA/Oceananigans.jl",
   "entries": {
     "Oceananigans.jl Benchmarks": [
@@ -68394,6 +68394,213 @@ window.BENCHMARK_DATA = {
           {
             "name": "Distributed/tripolar 360x180x50 F64/NVIDIA TITAN V/1x1x1",
             "value": 0.055926498469999995,
+            "unit": "s/timestep"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "mason",
+            "username": "masonlee277",
+            "email": "46269622+masonlee277@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "b7612fde250edf58605477dd34ce12c033d4a5b0",
+          "message": "Rescale the ZWENO α weights so Float32 cannot overflow to NaN (#6015)\n\n* Rescale the ZWENO α weights so Float32 cannot overflow to NaN\n\nβ and τ both scale with the square of the reconstructed field while ϵ is\nabsolute, so a flat sub-stencil beside a large jump drives τ / (βᵣ + ϵ)\narbitrarily high. In Float32 its square overflows for jumps ≳ 1e5, so α = Inf\nand every normalized weight is NaN. This is reachable from a physical\nsimulation: advecting number concentrations of ~3e5 kg⁻¹ in a Float32 P3\nmicrophysics run produced NaN at the cloud edge.\n\nDivide every αᵣ by M² where M = max(1, τ / dmin) and dmin = minᵣ (βᵣ + ϵ):\n\n    αᵣ / M² = C★ᵣ [a² + (b dmin / dᵣ)²],  a = min(1, dmin/τ),  b = min(1, τ/dmin)\n\nEvery factor is at most one, so no term can overflow at any input magnitude\nand no cutoff has to be chosen. M² is common to all r and the weights are\nnormalized by Σα, so the weights returned are unchanged.\n\nThe limits are the intended ones: τ = 0 gives αᵣ = C★ᵣ, and a τ that overflows\ngives C★ᵣ (dmin / dᵣ)², the ratio the weights tend to. dmin ≥ ϵ > 0, so no\ndenominator can vanish.\n\nCo-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>\n\n* Form the ZWENO rescaling without ever dividing by τ\n\nThe first revision of this rescaling wrote the two factors as min(1, dmin/τ)\nand min(1, τ/dmin). Both divide by τ, which is zero wherever the flow is\nsmooth — that is, nearly everywhere in a real run.\n\nThe values survived, because min(1, dmin/0) is min(1, Inf) = 1, so this did not\nshow up as an error. Two things broke quietly instead. Under\n`BackendOptimizedDivision` the division is `FastMath.div_fast`, where a zero\ndenominator is undefined, and the two kernel configurations in the active-cells\nmap test stopped agreeing on the advected tracer. And reverse-mode Enzyme\ndifferentiating dmin/τ at τ = 0 produced a NaN gradient, so the\nadvection-diffusion Enzyme test returned NaN for its relative error.\n\nWriting a as dmin/max(τ, dmin) gives the same number without dividing by τ, and\nb as min(1, τ/dmin) divides by dmin instead. Both denominators are at least\nϵ > 0 for every input. b is also now correct when τ overflows to Inf, where\nτ/max(τ, dmin) would have been Inf/Inf.\n\nThe overflow case this PR exists to fix is unchanged, and now sums to exactly\none under both dividers rather than 1 - 6e-8 under the fast one.\n\nVerified locally at this commit: `test_active_cells_map` 2823/2823 (matching\nmain, against 2822/1 before), `test_enzyme` advection-diffusion 2/2 (against a\nNaN), and the WENO smoothness tests 18 + 18 + 42 + 800.\n\nCo-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>\n\n* Trim the comments\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\n\n* Avoid using absolute tolerance in tests\n\n* Keep the unscaled ZWENO weights in Float64\n\nRescaling the α weights by M² stops them overflowing in Float32, but it costs a\n`minimum` over the smoothness indicators, two divisions and an extra multiply per\nsub-stencil in every WENO reconstruction. In Float64 that made the 1° tripolar\n`earth_ocean` benchmark (WENOVectorInvariant + WENO7, CATKE) 16% slower on an\nRTX 5090, and the WENO9 variant 18% slower:\n\n                       before rescaling   rescaled    this commit\n    WENO default       81.69 ms           94.94 ms    81.69 ms\n    WENO9              115.95 ms          136.69 ms   115.97 ms\n\nFloat64 has no need for it: (τ / ϵ)² overflows only for τ / ϵ ≳ 1e154. Use the\nrescaled weights for any float type except Float64 and BigFloat, which keep the\noriginal formula and its cost.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01WT9krmT8GB1VKktzgeFD6G\n\n* Test the Float32 third-order WENO weights beside a large jump\n\nThe existing jump test covers orders 5, 7 and 9 with a jump of 3e5. At third order\nthat jump does not overflow even without the rescaling (τ / ϵ ≈ 9e18, whose square\nstill fits in Float32), yet third order is where the overflow shows up in practice:\nit is the fallback WENO uses next to immersed boundaries. In the Float32 `earth_ocean`\nbenchmark on a 1° tripolar grid, the transport divergence reconstructed by the\nvector-invariant scheme reaches ~1e6 m³/s there, and a flat sub-stencil beside it made\nthe weights NaN, which then filled the domain within a time step.\n\nTest third order with a jump of 3e6 (τ / ϵ ≈ 9e20). This fails with NaN weights\nwithout the rescaling. The weight of the rough sub-stencil is a Float32 subnormal\n(≈ 5e-42), which cannot match the Float64 reference to a relative tolerance, so\ncompare with an absolute one.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01WT9krmT8GB1VKktzgeFD6G\n\n* Don't set ridiculously large absolute tolerance\n\n```\nω = (4.94f-42, 1.0f0)\nreference = (4.9382715449138664e-42, 1.0)\n```\n\nNo wonder the test passed with an absolute tolerance 36 orders of magnitude\nlarger than the numbers compared.\n\n* Also remove nonsense reference to absolute tolerance in comment\n\n* remove the division wgile avoiding overflows\n\n* Build the ZWENO rescaling thresholds in the scheme's float type\n\nThe BFloat16 methods reused the Float32 literals and only worked because\n`ϵ` promoted everything to Float32. Generate the thresholds and σ values\nfrom the scheme's own float type, hoist `minimum(β) + ϵ` into a local,\nand document why the underflow of σ² and the overflow of the threshold\nproducts are both harmless.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01WnhwgUJiw1s34G4DgmujPU\n\n* Sweep the Float32 and BFloat16 WENO weights across every rescaling regime\n\nReplace the two hand-picked jumps with a sweep over orders 3 to 9, jumps\nfrom 2^8 to 2^56, and a background slope that makes the rescaling\nthresholds themselves overflow. Compare against the ZWENO formula\nevaluated in Float64 from the scheme's own β and τ, so that BFloat16 can\nbe checked without being dominated by its 8-bit smoothness coefficients,\nand keep the end-to-end Float64 comparison for Float32.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01WnhwgUJiw1s34G4DgmujPU\n\n* Test the unscaled Float64 and BigFloat ZWENO weights too\n\nThe Float64 scheme only ever served as the reference, so the unscaled\nbranch of the α loop was never compared with an independent evaluation.\nRun both weight testsets for every supported float type, evaluate the\nreference ZWENO formula in BigFloat, and tighten the tolerance to one\nhundred ulps of the weights' own type.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01WnhwgUJiw1s34G4DgmujPU\n\n* Compare every float type end to end with the BigFloat WENO scheme\n\nThe end-to-end check against a Float64 scheme only ran for Float32. Run\nit for every type against the BigFloat scheme instead, with a tolerance\nof fifty ulps of the scheme's type: the deviation comes from the\nFT-rounded smoothness coefficients and measures about ten ulps for\nFloat64, Float32 and BFloat16 alike.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01WnhwgUJiw1s34G4DgmujPU\n\n* Tighten up relative tolerance\n\n* Check the smoothness indicators of every supported float type\n\nRun the literature reference test over `fully_supported_float_types`,\nevaluating the reference with spare precision because its value form\ncancels about 27 bits for a mean of 300, which BigFloat would otherwise\nexpose. The Float32 cancellation testset overlapped with it and with the\nweights tests, so fold its smooth profile and its β ≥ 0 check into the\ngeneric weights test and drop it.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01WnhwgUJiw1s34G4DgmujPU\n\n---------\n\nCo-authored-by: Claude Opus 5 (1M context) <noreply@anthropic.com>\nCo-authored-by: Mason Lee <masonlee942@gmail.com>\nCo-authored-by: Mosè Giordano <mose@gnu.org>\nCo-authored-by: Gregory L. Wagner <wagner.greg@gmail.com>\nCo-authored-by: Mosè Giordano <765740+giordano@users.noreply.github.com>\nCo-authored-by: Simone Silvestri <silvestri.simone0@gmail.com>",
+          "timestamp": "2026-10-05T18:38:23Z",
+          "url": "https://github.com/CliMA/Oceananigans.jl/commit/b7612fde250edf58605477dd34ce12c033d4a5b0"
+        },
+        "date": 1791236643724,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Default/tripolar 360x180x50 F64/NVIDIA TITAN V/default",
+            "value": 0.05484949109000001,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gu_",
+            "value": 2.4048975,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gv_",
+            "value": 2.299313,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__rk_substep_turbulent_kinetic_energy_",
+            "value": 1.993171,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_CATKE_closure_fields_",
+            "value": 1.470647,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.944794,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.93929,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.93625,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_w_from_continuity_",
+            "value": 0.317918,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_TKE_diffusivity_",
+            "value": 0.595389,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_split_explicit_transport_velocities_",
+            "value": 0.456733,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/180x90x50",
+            "value": 0.01657638042,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/720x360x50",
+            "value": 0.21162939907999997,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F32",
+            "value": 0.03296880372,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/nothing",
+            "value": 0.03170257874,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+Biharmonic",
+            "value": 0.07973610778000001,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+GM+Biharmonic",
+            "value": 0.24971373971,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/nothing+nothing",
+            "value": 0.03658028902,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant5+WENO5",
+            "value": 0.049563794650000007,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant9+WENO9",
+            "value": 0.07291912261,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon_zstar",
+            "value": 0.06868858772,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon_zstar",
+            "value": 0.06357770987,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar_zstar",
+            "value": 0.06166732927,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon",
+            "value": 0.056312364749999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon",
+            "value": 0.0566754481,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/3 tracers",
+            "value": 0.0587962325,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Nonhydrostatic Pressure Solver Sweep/Nonhydrostatic_FFT_64x64x64_F64_WENO5/NVIDIA TITAN V/64x64x64",
+            "value": 0.00281105999,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Nonhydrostatic Pressure Solver Sweep/Nonhydrostatic_FourierTridiagonal_64x64x64_F64_WENO5/NVIDIA TITAN V/64x64x64",
+            "value": 0.0031831679,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Nonhydrostatic Pressure Solver Sweep/Nonhydrostatic_ConjugateGradient_64x64x64_F64_WENO5/NVIDIA TITAN V/64x64x64",
+            "value": 0.02139505948,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Distributed/tripolar 360x180x50 F64/NVIDIA TITAN V/1x2x1",
+            "value": 0.048375034059999995,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/360x180x50",
+            "value": 0.05484949109000001,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F64",
+            "value": 0.05484949109000001,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE",
+            "value": 0.05484949109000001,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariantDefault+WENO7",
+            "value": 0.05484949109000001,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar",
+            "value": 0.05484949109000001,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
+            "value": 0.05484949109000001,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Distributed/tripolar 360x180x50 F64/NVIDIA TITAN V/1x1x1",
+            "value": 0.05484949109000001,
             "unit": "s/timestep"
           }
         ]
