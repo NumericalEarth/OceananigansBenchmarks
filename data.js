@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791242340777,
+  "lastUpdate": 1791247987380,
   "repoUrl": "https://github.com/CliMA/Oceananigans.jl",
   "entries": {
     "Oceananigans.jl Benchmarks": [
@@ -68808,6 +68808,213 @@ window.BENCHMARK_DATA = {
           {
             "name": "Distributed/tripolar 360x180x50 F64/NVIDIA TITAN V/1x1x1",
             "value": 0.05488964902,
+            "unit": "s/timestep"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Mosè Giordano",
+            "username": "giordano",
+            "email": "765740+giordano@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "2b2bfecde29ee9110f18dacc73e75487ed167311",
+          "message": "Silence other tests (#6139)\n\n* Silence the dynamics tests\n\n`test/time_stepping/dynamics.jl` printed the messages of every verbose\nsimulation, a warning for every `NonhydrostaticModel` built on an immersed\ngrid, numerical diagnostics and `@info \"Testing ...\"` banners.  Make the\nsimulations non-verbose, check the FFT pressure solver warning with\n`@test_logs`, drop the diagnostics, which the tests already check, and\nmove the information in the banners to the `@testset` names.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01SM1NYvzGwiwwz3cGcH21aJ\n\n* Silence the boundary condition time-stepping tests\n\n`test/time_stepping/boundary_conditions.jl` printed the messages of the\nverbose flux budget simulations, a warning for every `NonhydrostaticModel`\nbuilt on an immersed grid and `@info \"Testing ...\"` banners.  Make the\nsimulations non-verbose, check the FFT pressure solver warning with\n`@test_logs`, and move the information in the banners to the `@testset`\nnames.  Tests skipped on GPUs because of issue #4165 now use `skip`, which\nshows them in the test summary instead of logging a message.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01SM1NYvzGwiwwz3cGcH21aJ\n\n* Silence the hydrostatic free surface model tests\n\n`test/hydrostatic_free_surface/models.jl` printed the messages of every\nverbose simulation, the advection order reductions on grids with a single\ncell in the vertical and `@info \"Testing ...\"` banners.  Make the\nsimulations non-verbose, check the advection order reductions with\n`@test_logs`, and move the information in the banners to the `@testset`\nnames.  Also write the output of the `PrescribedVelocityFields` test to a\ntemporary directory instead of the working directory.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01SM1NYvzGwiwwz3cGcH21aJ\n\n* Assert the diffusion budget and Taylor-Green errors inside the test helpers\n\nThe diffusion budget and Taylor-Green vortex helpers returned a `Bool`, so\na failing test only reported `false`.  Assert the means and errors in the\nhelpers instead, so that failures show the values that the removed\n`@info` messages used to print.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01SM1NYvzGwiwwz3cGcH21aJ\n\n* Silence the `FilteredTimeInterval` tests\n\n`test/simulation/filtered_time_interval.jl` printed the messages of every\nverbose simulation and a warning every time a `FieldTimeSeries` was read\nfrom a NetCDF file or a Zarr store.  Make the simulations non-verbose and\ncheck the boundary condition warnings with `@test_logs`.  The checkpoint\npickup is not checked yet, because under ParallelTestRunner the\n`Checkpointer` also warns about storing the filtered operand's function\n(#6137) and the JLD2 writer about writing its metadata again (#6138).\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01SM1NYvzGwiwwz3cGcH21aJ\n\n* Silence the implicit diffusion diagnostic tests\n\n`test/simulation/implicit_diffusion.jl` printed the messages of every\nverbose simulation, the warning emitted when `VarianceDissipation` callbacks\nare switched to `ConsecutiveIterations`, and `@info \"Testing ...\"` banners.\nMake the simulations non-verbose, check the schedule warning with\n`@test_logs`, and move the information in the banners to the `@testset`\nnames.  Also write the output to a temporary directory instead of the\nworking directory.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01SM1NYvzGwiwwz3cGcH21aJ\n\n* Silence the Lagrangian particle tracking tests\n\n`test/lagrangian_particles/tracking.jl` printed the messages of every\nverbose simulation, the checkpoint pickup message and `@info \"Testing ...\"`\nbanners.  Make the simulations non-verbose, check the pickup message with\n`@test_logs`, and move the information in the banners to the `@testset`\nnames, which now also show the kind of vertical grid instead of `Symbol`.\nAlso write the output and the checkpoints to a temporary directory instead\nof the working directory.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01SM1NYvzGwiwwz3cGcH21aJ\n\n* Silence the checkpointer tests\n\n`test/simulation/checkpointer.jl` printed the message of every checkpoint\npickup, the messages of the verbose checkpointers, warnings about\nexperimental and unvalidated models and closures, the FFT pressure solver\non immersed grids and the default checkpoint path, and `@info \"Testing ...\"`\nbanners.  Check these messages with `@test_logs`, which replaces the\n`@test_nowarn` around pickups, and drop the banners, which are redundant\nwith the testset names.  The pickups in the file splitting tests are left\nalone, since #6138 changes them to check the JLD2 writer warnings.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01SM1NYvzGwiwwz3cGcH21aJ\n\n* Remove the remaining banners from the immersed boundary grid tests\n\n`test_partial_cell_bottom_grid_spacings` still logged which vertical\ndiscretization it was testing.  Run it in a `@testset` for each vertical\ndiscretization instead.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01SM1NYvzGwiwwz3cGcH21aJ\n\n* Silence the `FieldTimeSeries` round-trip tests\n\n`test/simulation/round_trip.jl` printed the messages of every verbose\nsimulation, the FFT pressure solver warning on immersed grids, the warnings\nemitted when reading boundary conditions back from NetCDF files and Zarr\nstores, and `@info \"Testing ...\"` banners.  Make the simulations\nnon-verbose, check the warnings with `@test_logs`, and move the information\nin the banners to the `@testset` names.  Also write the output to a\ntemporary directory instead of the working directory.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01SM1NYvzGwiwwz3cGcH21aJ\n\n* Silence the output readers tests\n\n`test/simulation/output_readers.jl` printed the messages of every verbose\nsimulation, the warnings emitted when reading boundary conditions back from\nNetCDF files and when the last `time_average` window is shorter than the\nothers, a warning of its own about skipping a NetCDF writer, and\n`@info \"Testing ...\"` banners.  Make the simulations non-verbose, check the\nreader and `time_average` warnings with `@test_logs`, turn the test's own\nwarning into a comment, and drop the banners, which are redundant with the\ntestset names.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01SM1NYvzGwiwwz3cGcH21aJ\n\n* Silence the turbulence closure tests\n\n`test/turbulence_closures/closures.jl` printed `@info \"Testing ...\"`\nbanners and the warning emitted when building a `RiBasedVerticalDiffusivity`.\nCheck the warning with `@test_logs`, and move the information in the\nbanners to `@testset` names, splitting the CATKE time-stepping tests into\none testset per closure combination.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01SM1NYvzGwiwwz3cGcH21aJ\n\n* Stop printing statistics in the regression tests\n\n`summarize_regression_test` logged the minimum, maximum, mean and spread of\nthe difference from the reference data, and the number of matching grid\npoints, for every field of every regression test.  Every field is already\nchecked pointwise with `@test all(test_fields.φ .≈ reference_fields.φ)`, so\nthe statistics only added noise to the test logs.  Remove the helper, its\ncalls, and a leftover `@show` in the ocean large eddy simulation test.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01SM1NYvzGwiwwz3cGcH21aJ\n\n* Write the output readers test files to temporary directories\n\n`test/simulation/output_readers.jl` wrote its output and series files to\nthe working directory, and left some of them behind.  Write each of them\nto a temporary directory instead, and remove the directory once the test\nis done with it.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01SM1NYvzGwiwwz3cGcH21aJ\n\n* `typeof(arch)` -> `summary(arch)`\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-06T00:07:38Z",
+          "url": "https://github.com/CliMA/Oceananigans.jl/commit/2b2bfecde29ee9110f18dacc73e75487ed167311"
+        },
+        "date": 1791247986290,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Default/tripolar 360x180x50 F64/NVIDIA TITAN V/default",
+            "value": 0.05487792035,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gu_",
+            "value": 2.4050885,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gv_",
+            "value": 2.3001285,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__rk_substep_turbulent_kinetic_energy_",
+            "value": 1.993139,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_CATKE_closure_fields_",
+            "value": 1.4708385,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.944442,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.939065,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.936474,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_w_from_continuity_",
+            "value": 0.318141,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_TKE_diffusivity_",
+            "value": 0.595452,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_split_explicit_transport_velocities_",
+            "value": 0.456573,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/180x90x50",
+            "value": 0.01649718508,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/720x360x50",
+            "value": 0.21181455783,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F32",
+            "value": 0.03298008029,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/nothing",
+            "value": 0.031355109799999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+Biharmonic",
+            "value": 0.07981425724,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+GM+Biharmonic",
+            "value": 0.24884632184,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/nothing+nothing",
+            "value": 0.0366048632,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant5+WENO5",
+            "value": 0.04937347445,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant9+WENO9",
+            "value": 0.07292531658,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon_zstar",
+            "value": 0.06861204329000001,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon_zstar",
+            "value": 0.06352830506,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar_zstar",
+            "value": 0.06167250623,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon",
+            "value": 0.056300804409999995,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon",
+            "value": 0.056672802640000006,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/3 tracers",
+            "value": 0.058765146379999994,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Nonhydrostatic Pressure Solver Sweep/Nonhydrostatic_FFT_64x64x64_F64_WENO5/NVIDIA TITAN V/64x64x64",
+            "value": 0.00274881961,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Nonhydrostatic Pressure Solver Sweep/Nonhydrostatic_FourierTridiagonal_64x64x64_F64_WENO5/NVIDIA TITAN V/64x64x64",
+            "value": 0.00332493123,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Nonhydrostatic Pressure Solver Sweep/Nonhydrostatic_ConjugateGradient_64x64x64_F64_WENO5/NVIDIA TITAN V/64x64x64",
+            "value": 0.02223082041,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Distributed/tripolar 360x180x50 F64/NVIDIA TITAN V/1x2x1",
+            "value": 0.04841867006,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/360x180x50",
+            "value": 0.05487792035,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F64",
+            "value": 0.05487792035,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE",
+            "value": 0.05487792035,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariantDefault+WENO7",
+            "value": 0.05487792035,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar",
+            "value": 0.05487792035,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
+            "value": 0.05487792035,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Distributed/tripolar 360x180x50 F64/NVIDIA TITAN V/1x1x1",
+            "value": 0.05487792035,
             "unit": "s/timestep"
           }
         ]
