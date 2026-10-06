@@ -316,40 +316,62 @@
         letter-spacing: 0.12em;
         white-space: nowrap;
       }
-      .history-slider-wrap {
+      .history-range {
         flex: 1 1 auto;
         min-width: 120px;
         max-width: 480px;
-        position: relative;
         display: flex;
-        align-items: center;
+        flex-direction: column;
+        gap: 0.2rem;
+      }
+      .history-ends {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        color: var(--foam);
+        white-space: nowrap;
+      }
+      .history-slider-wrap {
+        --from-pct: 0%;
+        --to-pct: 100%;
+        position: relative;
         height: 22px;
       }
-      .history-slider {
-        --pct: 100%;
-        -webkit-appearance: none;
-        appearance: none;
-        width: 100%;
-        height: 22px;
-        background: transparent;
-        cursor: grab;
-        margin: 0;
-        padding: 0;
-      }
-      .history-slider:active {
-        cursor: grabbing;
-      }
-      /* WebKit track */
-      .history-slider::-webkit-slider-runnable-track {
+      /* Shared track, inset by the thumb radius so percentages land on thumb centres */
+      .history-slider-wrap::before {
+        content: "";
+        position: absolute;
+        left: 7px;
+        right: 7px;
+        top: 10px;
         height: 2px;
         border-radius: 1px;
         background: linear-gradient(
           to right,
-          var(--biolum) 0%,
-          var(--biolum) var(--pct),
-          var(--current) var(--pct),
-          var(--current) 100%
+          var(--current) var(--from-pct),
+          var(--biolum) var(--from-pct),
+          var(--biolum) var(--to-pct),
+          var(--current) var(--to-pct)
         );
+      }
+      .history-slider {
+        -webkit-appearance: none;
+        appearance: none;
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 22px;
+        background: transparent;
+        margin: 0;
+        padding: 0;
+        pointer-events: none;
+      }
+      /* WebKit track */
+      .history-slider::-webkit-slider-runnable-track {
+        height: 2px;
+        background: transparent;
       }
       /* WebKit thumb */
       .history-slider::-webkit-slider-thumb {
@@ -362,6 +384,8 @@
         border: 1px solid var(--abyss);
         margin-top: -6px;
         box-shadow: 0 0 12px rgba(0, 229, 200, 0.4);
+        cursor: grab;
+        pointer-events: auto;
         transition: width 0.18s ease, height 0.18s ease,
           margin-top 0.18s ease, box-shadow 0.18s ease;
       }
@@ -372,16 +396,13 @@
         margin-top: -7px;
         box-shadow: 0 0 18px rgba(0, 229, 200, 0.55);
       }
+      .history-slider:active::-webkit-slider-thumb {
+        cursor: grabbing;
+      }
       /* Firefox track */
       .history-slider::-moz-range-track {
         height: 2px;
-        border-radius: 1px;
-        background: var(--current);
-      }
-      .history-slider::-moz-range-progress {
-        height: 2px;
-        border-radius: 1px;
-        background: var(--biolum);
+        background: transparent;
       }
       /* Firefox thumb */
       .history-slider::-moz-range-thumb {
@@ -391,8 +412,13 @@
         background: var(--biolum);
         border: 1px solid var(--abyss);
         box-shadow: 0 0 12px rgba(0, 229, 200, 0.4);
+        cursor: grab;
+        pointer-events: auto;
         transition: width 0.18s ease, height 0.18s ease,
           box-shadow 0.18s ease;
+      }
+      .history-slider:active::-moz-range-thumb {
+        cursor: grabbing;
       }
       .history-slider:hover::-moz-range-thumb,
       .history-slider:active::-moz-range-thumb {
@@ -470,7 +496,7 @@
         .history-label {
           display: none;
         }
-        .history-slider-wrap {
+        .history-range {
           flex: 1 1 100%;
           max-width: none;
           order: 2;
@@ -921,17 +947,33 @@
       </div>
       <div class="history-row">
         <div class="history-label">History Window</div>
-        <div class="history-slider-wrap">
-          <input
-            type="range"
-            class="history-slider"
-            id="history-slider"
-            min="5"
-            max="20"
-            step="1"
-            value="20"
-            aria-label="Number of commits shown in charts"
-          />
+        <div class="history-range">
+          <div class="history-ends">
+            <span id="history-from-label"></span>
+            <span id="history-to-label"></span>
+          </div>
+          <div class="history-slider-wrap" id="history-slider-wrap">
+            <input
+              type="range"
+              class="history-slider"
+              id="history-from"
+              min="0"
+              max="0"
+              step="1"
+              value="0"
+              aria-label="First commit shown in charts"
+            />
+            <input
+              type="range"
+              class="history-slider"
+              id="history-to"
+              min="0"
+              max="0"
+              step="1"
+              value="0"
+              aria-label="Last commit shown in charts"
+            />
+          </div>
         </div>
         <div class="history-readout" id="history-readout">
           <span class="current">20</span><span class="sep"> / </span><span class="total">20</span>
@@ -994,12 +1036,14 @@
 
         /* ── Mutable view state ───────────────────── */
         const state = {
-          maxCommits: DEFAULT_MAX_COMMITS,
-          totalCommits: DEFAULT_MAX_COMMITS,
+          commits: [],
+          fromIndex: 0,
+          toIndex: 0,
         };
 
-        /* ── Chart registry (for live re-windowing) ─ */
+        /* ── Chart and table registries (for live re-windowing) ─ */
         const chartRegistry = [];
+        const tableRegistry = [];
 
         /* ── Section descriptions ─────────────────── */
         const DESCRIPTIONS = {
@@ -1051,25 +1095,21 @@
 
           /* ── Stats ───────────────────────────────── */
           const entries = data.entries[Object.keys(data.entries)[0]];
-          // Use the largest entry length across all benchmark groups so the
-          // slider can scrub across the full available history even if some
-          // groups have fewer recorded runs.
-          const totalCommits = Math.max(
-            ...Object.values(data.entries).map((e) => e.length)
-          );
-          state.totalCommits = totalCommits;
-
-          // Bootstrap initial window size: ?n= URL param, clamped to [MIN, total]
-          const params = new URLSearchParams(window.location.search);
-          const requested = parseInt(params.get("n"), 10);
-          if (Number.isFinite(requested)) {
-            state.maxCommits = Math.max(
-              MIN_COMMITS,
-              Math.min(requested, totalCommits)
-            );
-          } else {
-            state.maxCommits = Math.min(DEFAULT_MAX_COMMITS, totalCommits);
+          // A re-uploaded commit keeps its latest date, matching how each chart deduplicates by commit id.
+          const commitsById = new Map();
+          for (const entry of Object.values(data.entries).flat()) {
+            commitsById.set(entry.commit.id, {
+              id: entry.commit.id,
+              date: entry.date,
+              commit: entry.commit,
+            });
           }
+          state.commits = [...commitsById.values()].sort((a, b) => a.date - b.date);
+          const totalCommits = state.commits.length;
+
+          [state.fromIndex, state.toIndex] = windowFromUrl(
+            new URLSearchParams(window.location.search)
+          );
 
           const totalBenches = entries.reduce(
             (s, e) => s + e.benches.length,
@@ -1112,6 +1152,67 @@
 
           /* ── Collect hierarchy ───────────────────── */
           return collectHierarchy(entries);
+        }
+
+        /* ── History window ───────────────────────── */
+        function defaultWindow() {
+          const last = state.commits.length - 1;
+          return [Math.max(0, last - DEFAULT_MAX_COMMITS + 1), last];
+        }
+
+        function clampWindow(from, to) {
+          const last = state.commits.length - 1;
+          const span = Math.min(MIN_COMMITS, last + 1);
+          const end = Math.min(Math.max(to, span - 1), last);
+          return [Math.max(0, Math.min(from, end - span + 1)), end];
+        }
+
+        function commitIndex(sha) {
+          if (!sha) return -1;
+          const prefix = sha.toLowerCase();
+          return state.commits.findIndex((c) => c.id.startsWith(prefix));
+        }
+
+        // ?from=&to= take sha prefixes (a missing `to` follows the latest commit); ?n= keeps the last n.
+        function windowFromUrl(params) {
+          const last = state.commits.length - 1;
+          const from = commitIndex(params.get("from"));
+          const to = commitIndex(params.get("to"));
+          if (from < 0 && to < 0) {
+            const n = parseInt(params.get("n"), 10);
+            return Number.isFinite(n) ? clampWindow(last - n + 1, last) : defaultWindow();
+          }
+          const end = to < 0 ? last : to;
+          const start = from < 0 ? end - DEFAULT_MAX_COMMITS + 1 : from;
+          return clampWindow(Math.min(start, end), Math.max(start, end));
+        }
+
+        function inWindow(sorted) {
+          const ids = new Set(
+            state.commits.slice(state.fromIndex, state.toIndex + 1).map((c) => c.id)
+          );
+          return sorted.filter((c) => ids.has(c.id));
+        }
+
+        function sortedCommits(variantMap) {
+          const allCommits = new Map();
+          for (const results of variantMap.values()) {
+            for (const r of results) {
+              allCommits.set(r.commit.id, {
+                id: r.commit.id,
+                date: r.date,
+                commit: r.commit,
+              });
+            }
+          }
+          return [...allCommits.values()].sort((a, b) => a.date - b.date);
+        }
+
+        function shortDate(timestamp) {
+          const date = new Date(timestamp);
+          const options = { month: "short", day: "numeric" };
+          if (date.getFullYear() !== new Date().getFullYear()) options.year = "numeric";
+          return date.toLocaleDateString("en-US", options);
         }
 
         function timeAgo(date) {
@@ -1287,22 +1388,17 @@
         /* ── Chart rendering ──────────────────────── */
         /* ── Data table beside chart ───────────── */
         function buildDataTable(variantMap, unitInfo) {
-          const TAIL = 5;
+          const div = document.createElement("div");
+          div.className = "chart-data-table";
+          const table = { div, variantMap, fullSorted: sortedCommits(variantMap) };
+          tableRegistry.push(table);
+          fillDataTable(table);
+          return div;
+        }
 
-          // Collect and sort all commits across variants
-          const allCommits = new Map();
-          for (const results of variantMap.values()) {
-            for (const r of results) {
-              allCommits.set(r.commit.id, {
-                id: r.commit.id,
-                date: r.date,
-                commit: r.commit,
-              });
-            }
-          }
-          const sorted = [...allCommits.values()]
-            .sort((a, b) => a.date - b.date)
-            .slice(-TAIL);
+        function fillDataTable({ div, variantMap, fullSorted }) {
+          const TAIL = 5;
+          const sorted = inWindow(fullSorted).slice(-TAIL);
 
           const variantNames = [...variantMap.keys()].sort();
 
@@ -1361,10 +1457,7 @@
 
           html += "</tbody></table>";
 
-          const div = document.createElement("div");
-          div.className = "chart-data-table";
           div.innerHTML = html;
-          return div;
         }
 
         function renderChart(container, variantMap, unitInfo) {
@@ -1373,25 +1466,12 @@
           canvas.style.height = "100%";
           container.appendChild(canvas);
 
-          // Collect all commits across variants
-          const allCommits = new Map();
-          for (const results of variantMap.values()) {
-            for (const r of results) {
-              allCommits.set(r.commit.id, {
-                id: r.commit.id,
-                date: r.date,
-                commit: r.commit,
-              });
-            }
-          }
-          // Full sorted commit list — we keep the full list and slice on demand
+          // Full sorted commit list — we keep the full list and filter on demand
           // so the slider can re-window without recomputing the hierarchy.
-          const fullSorted = [...allCommits.values()].sort(
-            (a, b) => a.date - b.date
-          );
+          const fullSorted = sortedCommits(variantMap);
           // Mutable view object: shared by closures (tooltip, onClick) and the
           // slider's applyWindow() so re-windowing updates everything in lockstep.
-          const view = { sorted: fullSorted.slice(-state.maxCommits) };
+          const view = { sorted: inWindow(fullSorted) };
 
           const variantNames = [...variantMap.keys()].sort();
           const datasets = [];
@@ -1594,35 +1674,65 @@
 
         /* ── History window slider ────────────────── */
         function setupHistorySlider() {
-          const slider = document.getElementById("history-slider");
+          const wrap = document.getElementById("history-slider-wrap");
+          const fromSlider = document.getElementById("history-from");
+          const toSlider = document.getElementById("history-to");
+          const fromLabel = document.getElementById("history-from-label");
+          const toLabel = document.getElementById("history-to-label");
           const readout = document.getElementById("history-readout");
           const reset = document.getElementById("history-reset");
-          if (!slider || !readout || !reset) return;
+          if (!wrap || !fromSlider || !toSlider || !readout || !reset) return;
 
           const currentEl = readout.querySelector(".current");
           const totalEl = readout.querySelector(".total");
+          const last = state.commits.length - 1;
+          const span = Math.min(MIN_COMMITS, last + 1);
+          const THUMB_RADIUS = 7;
 
-          slider.min = String(MIN_COMMITS);
-          slider.max = String(state.totalCommits);
-          slider.value = String(state.maxCommits);
-          totalEl.textContent = String(state.totalCommits);
+          for (const slider of [fromSlider, toSlider]) {
+            slider.min = "0";
+            slider.max = String(last);
+          }
+          totalEl.textContent = String(state.commits.length);
 
-          function syncReadoutAndFill() {
-            const v = state.maxCommits;
-            currentEl.textContent = String(v);
-            const range = state.totalCommits - MIN_COMMITS;
-            const pct = range > 0 ? ((v - MIN_COMMITS) / range) * 100 : 100;
-            slider.style.setProperty("--pct", pct + "%");
+          function isDefaultWindow() {
+            const [from, to] = defaultWindow();
+            return state.fromIndex === from && state.toIndex === to;
+          }
 
-            const isDefault =
-              v === Math.min(DEFAULT_MAX_COMMITS, state.totalCommits);
-            slider.classList.toggle("modified", !isDefault);
+          function labelEnd(label, slider, entry) {
+            const text = `${entry.id.slice(0, 7)} · ${shortDate(entry.commit.timestamp)}`;
+            label.textContent = text;
+            label.title = (entry.commit.message || "").split("\n")[0];
+            slider.setAttribute("aria-valuetext", text);
+          }
+
+          function stackSliders(fromOnTop) {
+            fromSlider.style.zIndex = fromOnTop ? "2" : "1";
+            toSlider.style.zIndex = fromOnTop ? "1" : "2";
+          }
+
+          function syncControls() {
+            fromSlider.value = String(state.fromIndex);
+            toSlider.value = String(state.toIndex);
+            currentEl.textContent = String(state.toIndex - state.fromIndex + 1);
+            const percent = (i) => (last > 0 ? (i / last) * 100 : 100) + "%";
+            wrap.style.setProperty("--from-pct", percent(state.fromIndex));
+            wrap.style.setProperty("--to-pct", percent(state.toIndex));
+            labelEnd(fromLabel, fromSlider, state.commits[state.fromIndex]);
+            labelEnd(toLabel, toSlider, state.commits[state.toIndex]);
+            // A pinned `to` can only move left, so let `from` take overlapping touches.
+            stackSliders(state.toIndex === last);
+
+            const isDefault = isDefaultWindow();
+            fromSlider.classList.toggle("modified", !isDefault);
+            toSlider.classList.toggle("modified", !isDefault);
             reset.disabled = isDefault;
           }
 
           function applyWindow() {
             for (const entry of chartRegistry) {
-              entry.view.sorted = entry.fullSorted.slice(-state.maxCommits);
+              entry.view.sorted = inWindow(entry.fullSorted);
               entry.chart.data.labels = entry.view.sorted.map((c) =>
                 c.id.slice(0, 7)
               );
@@ -1640,43 +1750,80 @@
               });
               entry.chart.update("none");
             }
+            for (const table of tableRegistry) {
+              fillDataTable(table);
+            }
           }
 
-          syncReadoutAndFill();
+          function setWindow(from, to) {
+            const changed = from !== state.fromIndex || to !== state.toIndex;
+            state.fromIndex = from;
+            state.toIndex = to;
+            syncControls();
+            if (changed) applyWindow();
+          }
 
-          slider.addEventListener("input", () => {
-            const v = parseInt(slider.value, 10);
-            if (!Number.isFinite(v) || v === state.maxCommits) return;
-            state.maxCommits = v;
-            syncReadoutAndFill();
-            applyWindow();
-          });
-
-          // Only update the URL when the user releases the slider, to avoid
-          // hammering history.replaceState during a drag.
-          slider.addEventListener("change", () => {
+          function updateUrl() {
             const url = new URL(window.location.href);
-            const isDefault =
-              state.maxCommits ===
-              Math.min(DEFAULT_MAX_COMMITS, state.totalCommits);
-            if (isDefault) {
-              url.searchParams.delete("n");
-            } else {
-              url.searchParams.set("n", String(state.maxCommits));
+            for (const key of ["n", "from", "to"]) url.searchParams.delete(key);
+            if (!isDefaultWindow()) {
+              url.searchParams.set("from", state.commits[state.fromIndex].id.slice(0, 7));
+              if (state.toIndex !== last) {
+                url.searchParams.set("to", state.commits[state.toIndex].id.slice(0, 7));
+              }
             }
             window.history.replaceState({}, "", url);
+          }
+
+          function moveFrom(index) {
+            setWindow(Math.min(index, state.toIndex - span + 1), state.toIndex);
+          }
+
+          function moveTo(index) {
+            setWindow(state.fromIndex, Math.max(index, state.fromIndex + span - 1));
+          }
+
+          function indexAt(clientX) {
+            const rect = wrap.getBoundingClientRect();
+            const usable = rect.width - 2 * THUMB_RADIUS;
+            const fraction = usable > 0 ? (clientX - rect.left - THUMB_RADIUS) / usable : 1;
+            return Math.round(Math.min(Math.max(fraction, 0), 1) * last);
+          }
+
+          function fromIsNearer(index) {
+            return index - state.fromIndex < state.toIndex - index;
+          }
+
+          syncControls();
+
+          fromSlider.addEventListener("input", () => moveFrom(parseInt(fromSlider.value, 10)));
+          toSlider.addEventListener("input", () => moveTo(parseInt(toSlider.value, 10)));
+
+          // Only update the URL when the user releases a handle, to avoid
+          // hammering history.replaceState during a drag.
+          fromSlider.addEventListener("change", updateUrl);
+          toSlider.addEventListener("change", updateUrl);
+
+          // Thumbs can overlap on long histories: raise the one nearer the pointer so both stay grabbable.
+          wrap.addEventListener("pointermove", (event) => {
+            if (!event.buttons) stackSliders(fromIsNearer(indexAt(event.clientX)));
+          });
+
+          // The inputs ignore pointer events outside their thumbs, so track clicks land on the wrapper.
+          wrap.addEventListener("pointerdown", (event) => {
+            if (event.target !== wrap) return;
+            const index = indexAt(event.clientX);
+            if (fromIsNearer(index)) {
+              moveFrom(index);
+            } else {
+              moveTo(index);
+            }
+            updateUrl();
           });
 
           reset.addEventListener("click", () => {
-            const def = Math.min(DEFAULT_MAX_COMMITS, state.totalCommits);
-            if (state.maxCommits === def) return;
-            state.maxCommits = def;
-            slider.value = String(def);
-            syncReadoutAndFill();
-            applyWindow();
-            const url = new URL(window.location.href);
-            url.searchParams.delete("n");
-            window.history.replaceState({}, "", url);
+            setWindow(...defaultWindow());
+            updateUrl();
           });
         }
 
