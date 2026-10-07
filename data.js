@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791387939408,
+  "lastUpdate": 1791390764747,
   "repoUrl": "https://github.com/CliMA/Oceananigans.jl",
   "entries": {
     "Oceananigans.jl Benchmarks": [
@@ -71085,6 +71085,213 @@ window.BENCHMARK_DATA = {
           {
             "name": "Distributed/tripolar 360x180x50 F64/NVIDIA TITAN V/1x1x1",
             "value": 0.05489730332,
+            "unit": "s/timestep"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "jackdfranklin",
+            "username": "jackdfranklin",
+            "email": "144433437+jackdfranklin@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "a05891aa8ab05382699f1e7dffa36a6cf656547d",
+          "message": "Use Julia asynchronous functionality for distributed GPU communications (#5897)\n\n* Initial attempt at async communications\n\n* Pass `record_event` to child arch for Distributed\n\n* Use `synchronize` to make host wait for CUDA event\n\n* Try using a Channel for mpi_requests\n\n* Create new CommState for fields to enable async task management\nAs channels/locks are thread safe, they are *moved* rather than copied.\nThis means that all fields created with the same architecture struct\nshare the same channels. To fix this, I have moved the comms to be\nstored in Field instead.\n\n* Remove `count_requests` and just increment the mpi_tag counter\nIf we are running distributed, the counter should always increase\nanyway?\n\n* Move DistributedField const declaration to top of file\n\n* Cleanup\n\n* Update tripolar distributed grid definition to include CommState\n\n* Remove use of CUDA synchronize\nOnly need to sync the host, not the stream\n\n* Switch async check to always be true if arch is async\n\n* Rename 'pool_requests_or_complete_comms!' and remove request pooling\nThis function is no longer called for async path so this is clearer\n\n* Remove incorrect inline\n\n* Add synchronicity of communications to summary of Distributed type\n\n* Use MPI.Request array rather than normal\n\n* Switch to using atomics for fill_events counter\n\n* Make cooperative_waitall! for channel more generic\n\n* Add guard to waitall, to avoid waiting for requests that never come\n\n* Switch order of `complete_fill_event` and `add_comm_requests`\n\n* Move CommState to CommunicationBuffers for Fields\nSince the distributed halo fill code splits up the Field struct, it was\neasiest to move the communication state into the buffers struct (plus\nthis was an intended change anyway)\n\n* Remove extra type from Field constructor\n\n* Fix Field constructor\n\n* Fix tripolar communication buffer by adding communication state\n\n* Add synchronization to distributed solver tests\nAlso moved test macro to function to get more information when test\nfails\n\n* Fix `add_comm_requests!` for CommunicationBuffers\nMissed out the `reqs` argument\n\n* Use `cooperative_waitall!` for all types of requests\n\n* Fixup Distributed arch show\n\n* Add synchronizations to set! for Distributed field\n\n* Use unique id for fields, rather than mpi_tag\nThis also means we don't need to track the number of live requests.\n\n* Remove requests initialisation and handle nothing request\n\n* Move mpi request code into separate function to avoid boxing\n\n* Add comms sync at start of distributed fill halo\n\n* Restore extra check for `async` kwarg\nThis ensures that only specific halo filling events are performed\nasynchronously\n\n* Add Adapt.adapt_structure for CommState (to nothing)\n\n* Remove `mpi_requests` from `Distributed` arch\n\n* Import Adapt into communication_state.jl\n\n* Fix Reactant Distributed arch\n\n* Add synchronisation to synchronous MPI comms\n\n* Remove unecessary synchronization for fill_halo_regions\n\n* Change cooperative_waitall! for Channel to avoid blocking\n\n* Use CUDA.synchronize on event to block thread but not stream\n\n* Make record_event synchronize execution for unsupported architectures\n\n* Remove unnecessary `synchronize_communication`s\n\n* Restore tests to origin/main state\n\n* Return to using a while loop to sync CuEvents\nTrying to avoid stream synchronizations\n\n* Initialize MPI with threadlevel=:multiple\nThis allows threads to initialise MPI comms\n\n* add a `yield()`\n\n* Export event functions and fix dispatching\n\n* Try to use stream synchronization for mpi comms\nCurrently there are sections of the timestep that need to wait for\ncommunications to complete due to data dependency. Some of these\ncomputations are made up of lots of small kernels. The fact that the\nhost waits for the MPI comms to complete means that the latency of\nsubmitting kernels becomes significant for these sections. By hopefully\nmaking the stream wait instead, we can still submit lots of work to the\nGPU and improve the utilization.\n\n* Revert \"Try to use stream synchronization for mpi comms\"\n\nThis reverts commit 0f2592ba99d7314d36b9cada6ffc9e5c14a447d6.\n\nThis doesn't work as intended and results in incorrect results\n\n* Remove reference to mpi_requests, mpi_tag in NCCL\nThe architecture no longer stores the MPI requests, they are now stored\nin the field buffers instead\n\n* Fix NCCL Distributed constructor\n\n* record also the stream\n\n* add a progress_comms\n\n* fix, prune and ensure no regression for one-thread\n\n* Post halo MPI requests into preallocated slots\n\nEach field's `CommState` now owns one `MPI.UnsafeMultiRequest` with a send and a\nreceive slot per side, laid out so that every exchange (west + east, south + north,\ncorners) uses a contiguous range of slots. The `DistributedFillHalo` kernels post into\ntheir slots and return the slot range instead of allocating a `Vector{MPI.Request}`.\n\n`progress_comms!` calls `MPI_Testall` directly on that range with a per-exchange flag\nstored in the state, so polling no longer allocates (`MPI.Testall` allocates its flag\nat every call). `waitall_comms!` completes a range for the synchronous paths, and\n`wait_for_comms!` completes all slots, which replaces `pending_requests` for\nsingle-threaded runs.\n\nOn the 360x180x50 tripolar benchmark (2 ranks, GPU, 4 threads) this removes ~27% of the\nallocations per time step on the rank that waits longest, at unchanged step time.\n\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>\n\n* simplify a bit claude's mess\n\n* small correct\n\n* oops\n\n* remove unrelated file\n\n* yield() is terrible on one thread\n\n* Apply suggestion from @simone-silvestri\n\n* account for reviews\n\n* run with 4 threads\n\n* answer to review\n\n* Check both default and interactive thread pools for spare threads\n\n* Use same ID_DIGITS const from DistributedComputations\n\n* change strategy to avoid allocations (events are stored now) this changes a bit the implementation but it should give us the best of all worlds\n\n* simplify progress worker\n\n* another quality of life change\n\n* simplify code paths\n\n* simplify naming scheme to be actually informative\n\n* remove the gc-safe CUDA allocations which increase as the thread is spinning\n\n---------\n\nCo-authored-by: Simone Silvestri <silvestri.simone0@gmail.com>\nCo-authored-by: Mosè Giordano <765740+giordano@users.noreply.github.com>\nCo-authored-by: Claude Opus 5.5 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-10-07T15:21:40Z",
+          "url": "https://github.com/CliMA/Oceananigans.jl/commit/a05891aa8ab05382699f1e7dffa36a6cf656547d"
+        },
+        "date": 1791390764445,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Default/tripolar 360x180x50 F64/NVIDIA TITAN V/default",
+            "value": 0.05484175506,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gu_",
+            "value": 2.4048325,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gv_",
+            "value": 2.299201,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__rk_substep_turbulent_kinetic_energy_",
+            "value": 1.990387,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_CATKE_closure_fields_",
+            "value": 1.470135,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.944249,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.939098,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.936282,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_w_from_continuity_",
+            "value": 0.318142,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_TKE_diffusivity_",
+            "value": 0.595068,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_split_explicit_transport_velocities_",
+            "value": 0.457021,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/180x90x50",
+            "value": 0.0173232904,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/720x360x50",
+            "value": 0.21161691808,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F32",
+            "value": 0.03300278975,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/nothing",
+            "value": 0.03134868456,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+Biharmonic",
+            "value": 0.07965784013,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+GM+Biharmonic",
+            "value": 0.24889082325,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/nothing+nothing",
+            "value": 0.03657159368,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant5+WENO5",
+            "value": 0.04941758072,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant9+WENO9",
+            "value": 0.07284877198,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon_zstar",
+            "value": 0.06860644313,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon_zstar",
+            "value": 0.06352243895,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar_zstar",
+            "value": 0.061652845139999995,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon",
+            "value": 0.05632410481,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon",
+            "value": 0.05659244427,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/3 tracers",
+            "value": 0.05874841902,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Nonhydrostatic Pressure Solver Sweep/Nonhydrostatic_FFT_64x64x64_F64_WENO5/NVIDIA TITAN V/64x64x64",
+            "value": 0.0026354515499999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Nonhydrostatic Pressure Solver Sweep/Nonhydrostatic_FourierTridiagonal_64x64x64_F64_WENO5/NVIDIA TITAN V/64x64x64",
+            "value": 0.00298408007,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Nonhydrostatic Pressure Solver Sweep/Nonhydrostatic_ConjugateGradient_64x64x64_F64_WENO5/NVIDIA TITAN V/64x64x64",
+            "value": 0.02226661471,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Distributed/tripolar 360x180x50 F64/NVIDIA TITAN V/1x2x1",
+            "value": 0.041177161379999994,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/360x180x50",
+            "value": 0.05484175506,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F64",
+            "value": 0.05484175506,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE",
+            "value": 0.05484175506,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariantDefault+WENO7",
+            "value": 0.05484175506,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar",
+            "value": 0.05484175506,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
+            "value": 0.05484175506,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Distributed/tripolar 360x180x50 F64/NVIDIA TITAN V/1x1x1",
+            "value": 0.05484175506,
             "unit": "s/timestep"
           }
         ]
