@@ -1,0 +1,874 @@
+[
+  {
+    "name": "EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr",
+    "group": "Default",
+    "float_type": "Float64",
+    "grid_size": [
+      360,
+      180,
+      50
+    ],
+    "time_steps": 100,
+    "samples": 1,
+    "Δt": 60,
+    "total_time_seconds": 5.489003839,
+    "time_per_step_seconds": 0.05489003839000001,
+    "time_per_step_median_seconds": 0.05489003839000001,
+    "time_per_step_max_seconds": 0.05489003839000001,
+    "steps_per_second": 18.218241949384065,
+    "grid_points_per_second": 59027103.916004375,
+    "gpu_memory_used": 1025667323,
+    "metadata": {
+      "julia_version": "1.12.2",
+      "oceananigans_version": "0.113.5",
+      "architecture": "GPU{CUDABackend}",
+      "gpu_name": "NVIDIA TITAN V",
+      "cuda_version": "12.9.0",
+      "cpu_model": "Intel(R) Xeon(R) Silver 4214 CPU @ 2.20GHz (cascadelake)",
+      "num_threads": 8,
+      "hostname": "tartarus",
+      "package_versions": {
+        "Adapt": "4.7.3",
+        "CUDA": "6.1.0",
+        "GPUArrays": "11.5.16",
+        "GPUCompiler": "1.17.1",
+        "KernelAbstractions": "0.9.44",
+        "LLVM": "9.13.2"
+      },
+      "timestamp": "2026-10-08T16:34:10.977"
+    },
+    "nsys_top_kernels": [
+      {
+        "name": "gpu_compute_hydrostatic_free_surface_Gu_(CompilerMetadata<DynamicSize",
+        "total_time_ns": 765614073,
+        "instances": 318,
+        "avg_time_ns": 2407591.4,
+        "med_time_ns": 2399984,
+        "min_time_ns": 2390032,
+        "max_time_ns": 2611855
+      },
+      {
+        "name": "gpu_compute_hydrostatic_free_surface_Gv_(CompilerMetadata<DynamicSize",
+        "total_time_ns": 732610322,
+        "instances": 318,
+        "avg_time_ns": 2303806,
+        "med_time_ns": 2296849,
+        "min_time_ns": 2289457,
+        "max_time_ns": 2498864
+      },
+      {
+        "name": "gpu__rk_substep_turbulent_kinetic_energy_(CompilerMetadata<DynamicSize",
+        "total_time_ns": 627362056,
+        "instances": 315,
+        "avg_time_ns": 1991625.6,
+        "med_time_ns": 1985459,
+        "min_time_ns": 1981299,
+        "max_time_ns": 2174706
+      },
+      {
+        "name": "gpu_compute_CATKE_closure_fields_(CompilerMetadata<OffsetStaticSize<_0_361__0_181__1_50_>",
+        "total_time_ns": 472382314,
+        "instances": 318,
+        "avg_time_ns": 1485479,
+        "med_time_ns": 1481478.5,
+        "min_time_ns": 1469782,
+        "max_time_ns": 1616374
+      },
+      {
+        "name": "gpu_compute_hydrostatic_free_surface_Gc_(CompilerMetadata<DynamicSize",
+        "total_time_ns": 298838883,
+        "instances": 315,
+        "avg_time_ns": 948694.9,
+        "med_time_ns": 946426,
+        "min_time_ns": 938586,
+        "max_time_ns": 1023737
+      },
+      {
+        "name": "gpu_compute_hydrostatic_free_surface_Gc_(CompilerMetadata<DynamicSize",
+        "total_time_ns": 297650872,
+        "instances": 315,
+        "avg_time_ns": 944923.4,
+        "med_time_ns": 942650,
+        "min_time_ns": 935674,
+        "max_time_ns": 1019353
+      },
+      {
+        "name": "gpu_compute_hydrostatic_free_surface_Gc_(CompilerMetadata<DynamicSize",
+        "total_time_ns": 295965016,
+        "instances": 315,
+        "avg_time_ns": 939571.5,
+        "med_time_ns": 937274,
+        "min_time_ns": 931418,
+        "max_time_ns": 1015065
+      },
+      {
+        "name": "gpu__compute_w_from_continuity_(CompilerMetadata<OffsetStaticSize<__5_366___5_186_>",
+        "total_time_ns": 203262120,
+        "instances": 633,
+        "avg_time_ns": 321109.2,
+        "med_time_ns": 320926,
+        "min_time_ns": 309310,
+        "max_time_ns": 340317
+      },
+      {
+        "name": "gpu_compute_TKE_diffusivity_(CompilerMetadata<DynamicSize",
+        "total_time_ns": 188156351,
+        "instances": 315,
+        "avg_time_ns": 597321.7,
+        "med_time_ns": 595996,
+        "min_time_ns": 589980,
+        "max_time_ns": 644092
+      },
+      {
+        "name": "gpu__compute_split_explicit_transport_velocities_(CompilerMetadata<OffsetStaticSize<__5_366___5_186___5_56_>",
+        "total_time_ns": 142787722,
+        "instances": 315,
+        "avg_time_ns": 453294.4,
+        "med_time_ns": 453341,
+        "min_time_ns": 445565,
+        "max_time_ns": 461821
+      }
+    ]
+  },
+  {
+    "name": "EarthOcean_tripolar_180x90x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr",
+    "group": "Resolution Sweep",
+    "float_type": "Float64",
+    "grid_size": [
+      180,
+      90,
+      50
+    ],
+    "time_steps": 100,
+    "samples": 1,
+    "Δt": 60,
+    "total_time_seconds": 1.649143258,
+    "time_per_step_seconds": 0.01649143258,
+    "time_per_step_median_seconds": 0.01649143258,
+    "time_per_step_max_seconds": 0.01649143258,
+    "steps_per_second": 60.63754589839278,
+    "grid_points_per_second": 49116412.17769815,
+    "gpu_memory_used": 282845854,
+    "metadata": {
+      "julia_version": "1.12.2",
+      "oceananigans_version": "0.113.5",
+      "architecture": "GPU{CUDABackend}",
+      "gpu_name": "NVIDIA TITAN V",
+      "cuda_version": "12.9.0",
+      "cpu_model": "Intel(R) Xeon(R) Silver 4214 CPU @ 2.20GHz (cascadelake)",
+      "num_threads": 8,
+      "hostname": "tartarus",
+      "package_versions": {
+        "Adapt": "4.7.3",
+        "CUDA": "6.1.0",
+        "GPUArrays": "11.5.16",
+        "GPUCompiler": "1.17.1",
+        "KernelAbstractions": "0.9.44",
+        "LLVM": "9.13.2"
+      },
+      "timestamp": "2026-10-08T16:39:27.889"
+    }
+  },
+  {
+    "name": "EarthOcean_tripolar_720x360x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr",
+    "group": "Resolution Sweep",
+    "float_type": "Float64",
+    "grid_size": [
+      720,
+      360,
+      50
+    ],
+    "time_steps": 100,
+    "samples": 1,
+    "Δt": 60,
+    "total_time_seconds": 21.196955178,
+    "time_per_step_seconds": 0.21196955178,
+    "time_per_step_median_seconds": 0.21196955178,
+    "time_per_step_max_seconds": 0.21196955178,
+    "steps_per_second": 4.7176586995753285,
+    "grid_points_per_second": 61140856.74649626,
+    "gpu_memory_used": 3888618423,
+    "metadata": {
+      "julia_version": "1.12.2",
+      "oceananigans_version": "0.113.5",
+      "architecture": "GPU{CUDABackend}",
+      "gpu_name": "NVIDIA TITAN V",
+      "cuda_version": "12.9.0",
+      "cpu_model": "Intel(R) Xeon(R) Silver 4214 CPU @ 2.20GHz (cascadelake)",
+      "num_threads": 8,
+      "hostname": "tartarus",
+      "package_versions": {
+        "Adapt": "4.7.3",
+        "CUDA": "6.1.0",
+        "GPUArrays": "11.5.16",
+        "GPUCompiler": "1.17.1",
+        "KernelAbstractions": "0.9.44",
+        "LLVM": "9.13.2"
+      },
+      "timestamp": "2026-10-08T16:42:18.769"
+    }
+  },
+  {
+    "name": "EarthOcean_tripolar_360x180x50_F32_WENOVectorInvariantDefault_WENO7_CATKE_2tr",
+    "group": "Float Type Sweep",
+    "float_type": "Float32",
+    "grid_size": [
+      360,
+      180,
+      50
+    ],
+    "time_steps": 100,
+    "samples": 1,
+    "Δt": 60,
+    "total_time_seconds": 3.303310015,
+    "time_per_step_seconds": 0.03303310015,
+    "time_per_step_median_seconds": 0.03303310015,
+    "time_per_step_max_seconds": 0.03303310015,
+    "steps_per_second": 30.272665764312162,
+    "grid_points_per_second": 98083437.0763714,
+    "gpu_memory_used": 518164595,
+    "metadata": {
+      "julia_version": "1.12.2",
+      "oceananigans_version": "0.113.5",
+      "architecture": "GPU{CUDABackend}",
+      "gpu_name": "NVIDIA TITAN V",
+      "cuda_version": "12.9.0",
+      "cpu_model": "Intel(R) Xeon(R) Silver 4214 CPU @ 2.20GHz (cascadelake)",
+      "num_threads": 8,
+      "hostname": "tartarus",
+      "package_versions": {
+        "Adapt": "4.7.3",
+        "CUDA": "6.1.0",
+        "GPUArrays": "11.5.16",
+        "GPUCompiler": "1.17.1",
+        "KernelAbstractions": "0.9.44",
+        "LLVM": "9.13.2"
+      },
+      "timestamp": "2026-10-08T16:47:03.669"
+    }
+  },
+  {
+    "name": "EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_nothing_2tr",
+    "group": "Closure Sweep",
+    "float_type": "Float64",
+    "grid_size": [
+      360,
+      180,
+      50
+    ],
+    "time_steps": 100,
+    "samples": 1,
+    "Δt": 60,
+    "total_time_seconds": 3.261213985,
+    "time_per_step_seconds": 0.03261213985,
+    "time_per_step_median_seconds": 0.03261213985,
+    "time_per_step_max_seconds": 0.03261213985,
+    "steps_per_second": 30.6634279320374,
+    "grid_points_per_second": 99349506.49980117,
+    "gpu_memory_used": 663087483,
+    "metadata": {
+      "julia_version": "1.12.2",
+      "oceananigans_version": "0.113.5",
+      "architecture": "GPU{CUDABackend}",
+      "gpu_name": "NVIDIA TITAN V",
+      "cuda_version": "12.9.0",
+      "cpu_model": "Intel(R) Xeon(R) Silver 4214 CPU @ 2.20GHz (cascadelake)",
+      "num_threads": 8,
+      "hostname": "tartarus",
+      "package_versions": {
+        "Adapt": "4.7.3",
+        "CUDA": "6.1.0",
+        "GPUArrays": "11.5.16",
+        "GPUCompiler": "1.17.1",
+        "KernelAbstractions": "0.9.44",
+        "LLVM": "9.13.2"
+      },
+      "timestamp": "2026-10-08T16:50:29.597"
+    }
+  },
+  {
+    "name": "EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE+Biharmonic_2tr",
+    "group": "Closure Sweep",
+    "float_type": "Float64",
+    "grid_size": [
+      360,
+      180,
+      50
+    ],
+    "time_steps": 100,
+    "samples": 1,
+    "Δt": 60,
+    "total_time_seconds": 7.976156543,
+    "time_per_step_seconds": 0.07976156543,
+    "time_per_step_median_seconds": 0.07976156543,
+    "time_per_step_max_seconds": 0.07976156543,
+    "steps_per_second": 12.53736677068626,
+    "grid_points_per_second": 40621068.33702348,
+    "gpu_memory_used": 1025667323,
+    "metadata": {
+      "julia_version": "1.12.2",
+      "oceananigans_version": "0.113.5",
+      "architecture": "GPU{CUDABackend}",
+      "gpu_name": "NVIDIA TITAN V",
+      "cuda_version": "12.9.0",
+      "cpu_model": "Intel(R) Xeon(R) Silver 4214 CPU @ 2.20GHz (cascadelake)",
+      "num_threads": 8,
+      "hostname": "tartarus",
+      "package_versions": {
+        "Adapt": "4.7.3",
+        "CUDA": "6.1.0",
+        "GPUArrays": "11.5.16",
+        "GPUCompiler": "1.17.1",
+        "KernelAbstractions": "0.9.44",
+        "LLVM": "9.13.2"
+      },
+      "timestamp": "2026-10-08T16:53:19.009"
+    }
+  },
+  {
+    "name": "EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE+GM+Biharmonic_2tr",
+    "group": "Closure Sweep",
+    "float_type": "Float64",
+    "grid_size": [
+      360,
+      180,
+      50
+    ],
+    "time_steps": 100,
+    "samples": 1,
+    "Δt": 60,
+    "total_time_seconds": 24.870945483,
+    "time_per_step_seconds": 0.24870945483,
+    "time_per_step_median_seconds": 0.24870945483,
+    "time_per_step_max_seconds": 0.24870945483,
+    "steps_per_second": 4.020755868262139,
+    "grid_points_per_second": 13027249.013169331,
+    "gpu_memory_used": 1063396443,
+    "metadata": {
+      "julia_version": "1.12.2",
+      "oceananigans_version": "0.113.5",
+      "architecture": "GPU{CUDABackend}",
+      "gpu_name": "NVIDIA TITAN V",
+      "cuda_version": "12.9.0",
+      "cpu_model": "Intel(R) Xeon(R) Silver 4214 CPU @ 2.20GHz (cascadelake)",
+      "num_threads": 8,
+      "hostname": "tartarus",
+      "package_versions": {
+        "Adapt": "4.7.3",
+        "CUDA": "6.1.0",
+        "GPUArrays": "11.5.16",
+        "GPUCompiler": "1.17.1",
+        "KernelAbstractions": "0.9.44",
+        "LLVM": "9.13.2"
+      },
+      "timestamp": "2026-10-08T16:57:36.434"
+    }
+  },
+  {
+    "name": "EarthOcean_tripolar_360x180x50_F64_nothing_nothing_CATKE_2tr",
+    "group": "Advection Sweep",
+    "float_type": "Float64",
+    "grid_size": [
+      360,
+      180,
+      50
+    ],
+    "time_steps": 100,
+    "samples": 1,
+    "Δt": 60,
+    "total_time_seconds": 3.656090608,
+    "time_per_step_seconds": 0.03656090608,
+    "time_per_step_median_seconds": 0.03656090608,
+    "time_per_step_max_seconds": 0.03656090608,
+    "steps_per_second": 27.35161972769139,
+    "grid_points_per_second": 88619247.91772011,
+    "gpu_memory_used": 1025667323,
+    "metadata": {
+      "julia_version": "1.12.2",
+      "oceananigans_version": "0.113.5",
+      "architecture": "GPU{CUDABackend}",
+      "gpu_name": "NVIDIA TITAN V",
+      "cuda_version": "12.9.0",
+      "cpu_model": "Intel(R) Xeon(R) Silver 4214 CPU @ 2.20GHz (cascadelake)",
+      "num_threads": 8,
+      "hostname": "tartarus",
+      "package_versions": {
+        "Adapt": "4.7.3",
+        "CUDA": "6.1.0",
+        "GPUArrays": "11.5.16",
+        "GPUCompiler": "1.17.1",
+        "KernelAbstractions": "0.9.44",
+        "LLVM": "9.13.2"
+      },
+      "timestamp": "2026-10-08T16:33:48.190"
+    }
+  },
+  {
+    "name": "EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariant5_WENO5_CATKE_2tr",
+    "group": "Advection Sweep",
+    "float_type": "Float64",
+    "grid_size": [
+      360,
+      180,
+      50
+    ],
+    "time_steps": 100,
+    "samples": 1,
+    "Δt": 60,
+    "total_time_seconds": 4.942948843,
+    "time_per_step_seconds": 0.04942948843,
+    "time_per_step_median_seconds": 0.04942948843,
+    "time_per_step_max_seconds": 0.04942948843,
+    "steps_per_second": 20.230838549263133,
+    "grid_points_per_second": 65547916.899612546,
+    "gpu_memory_used": 1025667323,
+    "metadata": {
+      "julia_version": "1.12.2",
+      "oceananigans_version": "0.113.5",
+      "architecture": "GPU{CUDABackend}",
+      "gpu_name": "NVIDIA TITAN V",
+      "cuda_version": "12.9.0",
+      "cpu_model": "Intel(R) Xeon(R) Silver 4214 CPU @ 2.20GHz (cascadelake)",
+      "num_threads": 8,
+      "hostname": "tartarus",
+      "package_versions": {
+        "Adapt": "4.7.3",
+        "CUDA": "6.1.0",
+        "GPUArrays": "11.5.16",
+        "GPUCompiler": "1.17.1",
+        "KernelAbstractions": "0.9.44",
+        "LLVM": "9.13.2"
+      },
+      "timestamp": "2026-10-08T16:35:30.793"
+    }
+  },
+  {
+    "name": "EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariant9_WENO9_CATKE_2tr",
+    "group": "Advection Sweep",
+    "float_type": "Float64",
+    "grid_size": [
+      360,
+      180,
+      50
+    ],
+    "time_steps": 100,
+    "samples": 1,
+    "Δt": 60,
+    "total_time_seconds": 7.285137039,
+    "time_per_step_seconds": 0.07285137039,
+    "time_per_step_median_seconds": 0.07285137039,
+    "time_per_step_max_seconds": 0.07285137039,
+    "steps_per_second": 13.726577752026278,
+    "grid_points_per_second": 44474111.91656514,
+    "gpu_memory_used": 1025667323,
+    "metadata": {
+      "julia_version": "1.12.2",
+      "oceananigans_version": "0.113.5",
+      "architecture": "GPU{CUDABackend}",
+      "gpu_name": "NVIDIA TITAN V",
+      "cuda_version": "12.9.0",
+      "cpu_model": "Intel(R) Xeon(R) Silver 4214 CPU @ 2.20GHz (cascadelake)",
+      "num_threads": 8,
+      "hostname": "tartarus",
+      "package_versions": {
+        "Adapt": "4.7.3",
+        "CUDA": "6.1.0",
+        "GPUArrays": "11.5.16",
+        "GPUCompiler": "1.17.1",
+        "KernelAbstractions": "0.9.44",
+        "LLVM": "9.13.2"
+      },
+      "timestamp": "2026-10-08T16:37:55.605"
+    }
+  },
+  {
+    "name": "EarthOcean_lat_lon_zstar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr",
+    "group": "Grid Type Sweep",
+    "float_type": "Float64",
+    "grid_size": [
+      360,
+      180,
+      50
+    ],
+    "time_steps": 100,
+    "samples": 1,
+    "Δt": 60,
+    "total_time_seconds": 6.860504324,
+    "time_per_step_seconds": 0.06860504324,
+    "time_per_step_median_seconds": 0.06860504324,
+    "time_per_step_max_seconds": 0.06860504324,
+    "steps_per_second": 14.576187883181051,
+    "grid_points_per_second": 47226848.74150661,
+    "gpu_memory_used": 1007870065,
+    "metadata": {
+      "julia_version": "1.12.2",
+      "oceananigans_version": "0.113.5",
+      "architecture": "GPU{CUDABackend}",
+      "gpu_name": "NVIDIA TITAN V",
+      "cuda_version": "12.9.0",
+      "cpu_model": "Intel(R) Xeon(R) Silver 4214 CPU @ 2.20GHz (cascadelake)",
+      "num_threads": 8,
+      "hostname": "tartarus",
+      "package_versions": {
+        "Adapt": "4.7.3",
+        "CUDA": "6.1.0",
+        "GPUArrays": "11.5.16",
+        "GPUCompiler": "1.17.1",
+        "KernelAbstractions": "0.9.44",
+        "LLVM": "9.13.2"
+      },
+      "timestamp": "2026-10-08T16:41:13.021"
+    }
+  },
+  {
+    "name": "EarthOcean_immersed_lat_lon_zstar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr",
+    "group": "Grid Type Sweep",
+    "float_type": "Float64",
+    "grid_size": [
+      360,
+      180,
+      50
+    ],
+    "time_steps": 100,
+    "samples": 1,
+    "Δt": 60,
+    "total_time_seconds": 6.344721095,
+    "time_per_step_seconds": 0.06344721095,
+    "time_per_step_median_seconds": 0.06344721095,
+    "time_per_step_max_seconds": 0.06344721095,
+    "steps_per_second": 15.76113409914987,
+    "grid_points_per_second": 51066074.48124558,
+    "gpu_memory_used": 1019808009,
+    "metadata": {
+      "julia_version": "1.12.2",
+      "oceananigans_version": "0.113.5",
+      "architecture": "GPU{CUDABackend}",
+      "gpu_name": "NVIDIA TITAN V",
+      "cuda_version": "12.9.0",
+      "cpu_model": "Intel(R) Xeon(R) Silver 4214 CPU @ 2.20GHz (cascadelake)",
+      "num_threads": 8,
+      "hostname": "tartarus",
+      "package_versions": {
+        "Adapt": "4.7.3",
+        "CUDA": "6.1.0",
+        "GPUArrays": "11.5.16",
+        "GPUCompiler": "1.17.1",
+        "KernelAbstractions": "0.9.44",
+        "LLVM": "9.13.2"
+      },
+      "timestamp": "2026-10-08T16:43:40.853"
+    }
+  },
+  {
+    "name": "EarthOcean_tripolar_zstar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr",
+    "group": "Grid Type Sweep",
+    "float_type": "Float64",
+    "grid_size": [
+      360,
+      180,
+      50
+    ],
+    "time_steps": 100,
+    "samples": 1,
+    "Δt": 60,
+    "total_time_seconds": 6.165104455,
+    "time_per_step_seconds": 0.06165104455,
+    "time_per_step_median_seconds": 0.06165104455,
+    "time_per_step_max_seconds": 0.06165104455,
+    "steps_per_second": 16.220325337537204,
+    "grid_points_per_second": 52553854.093620546,
+    "gpu_memory_used": 1029730459,
+    "metadata": {
+      "julia_version": "1.12.2",
+      "oceananigans_version": "0.113.5",
+      "architecture": "GPU{CUDABackend}",
+      "gpu_name": "NVIDIA TITAN V",
+      "cuda_version": "12.9.0",
+      "cpu_model": "Intel(R) Xeon(R) Silver 4214 CPU @ 2.20GHz (cascadelake)",
+      "num_threads": 8,
+      "hostname": "tartarus",
+      "package_versions": {
+        "Adapt": "4.7.3",
+        "CUDA": "6.1.0",
+        "GPUArrays": "11.5.16",
+        "GPUCompiler": "1.17.1",
+        "KernelAbstractions": "0.9.44",
+        "LLVM": "9.13.2"
+      },
+      "timestamp": "2026-10-08T16:47:03.657"
+    }
+  },
+  {
+    "name": "EarthOcean_lat_lon_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr",
+    "group": "Grid Type Sweep",
+    "float_type": "Float64",
+    "grid_size": [
+      360,
+      180,
+      50
+    ],
+    "time_steps": 100,
+    "samples": 1,
+    "Δt": 60,
+    "total_time_seconds": 5.632334369,
+    "time_per_step_seconds": 0.05632334369,
+    "time_per_step_median_seconds": 0.05632334369,
+    "time_per_step_max_seconds": 0.05632334369,
+    "steps_per_second": 17.75462773488617,
+    "grid_points_per_second": 57524993.8610312,
+    "gpu_memory_used": 1003800945,
+    "metadata": {
+      "julia_version": "1.12.2",
+      "oceananigans_version": "0.113.5",
+      "architecture": "GPU{CUDABackend}",
+      "gpu_name": "NVIDIA TITAN V",
+      "cuda_version": "12.9.0",
+      "cpu_model": "Intel(R) Xeon(R) Silver 4214 CPU @ 2.20GHz (cascadelake)",
+      "num_threads": 8,
+      "hostname": "tartarus",
+      "package_versions": {
+        "Adapt": "4.7.3",
+        "CUDA": "6.1.0",
+        "GPUArrays": "11.5.16",
+        "GPUCompiler": "1.17.1",
+        "KernelAbstractions": "0.9.44",
+        "LLVM": "9.13.2"
+      },
+      "timestamp": "2026-10-08T16:49:55.353"
+    }
+  },
+  {
+    "name": "EarthOcean_immersed_lat_lon_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr",
+    "group": "Grid Type Sweep",
+    "float_type": "Float64",
+    "grid_size": [
+      360,
+      180,
+      50
+    ],
+    "time_steps": 100,
+    "samples": 1,
+    "Δt": 60,
+    "total_time_seconds": 5.655999386,
+    "time_per_step_seconds": 0.056559993860000005,
+    "time_per_step_median_seconds": 0.056559993860000005,
+    "time_per_step_max_seconds": 0.056559993860000005,
+    "steps_per_second": 17.680341381847526,
+    "grid_points_per_second": 57284306.07718598,
+    "gpu_memory_used": 1015738889,
+    "metadata": {
+      "julia_version": "1.12.2",
+      "oceananigans_version": "0.113.5",
+      "architecture": "GPU{CUDABackend}",
+      "gpu_name": "NVIDIA TITAN V",
+      "cuda_version": "12.9.0",
+      "cpu_model": "Intel(R) Xeon(R) Silver 4214 CPU @ 2.20GHz (cascadelake)",
+      "num_threads": 8,
+      "hostname": "tartarus",
+      "package_versions": {
+        "Adapt": "4.7.3",
+        "CUDA": "6.1.0",
+        "GPUArrays": "11.5.16",
+        "GPUCompiler": "1.17.1",
+        "KernelAbstractions": "0.9.44",
+        "LLVM": "9.13.2"
+      },
+      "timestamp": "2026-10-08T16:51:59.209"
+    }
+  },
+  {
+    "name": "EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_3tr",
+    "group": "Tracer Count Sweep",
+    "float_type": "Float64",
+    "grid_size": [
+      360,
+      180,
+      50
+    ],
+    "time_steps": 100,
+    "samples": 1,
+    "Δt": 60,
+    "total_time_seconds": 5.87412681,
+    "time_per_step_seconds": 0.0587412681,
+    "time_per_step_median_seconds": 0.0587412681,
+    "time_per_step_max_seconds": 0.0587412681,
+    "steps_per_second": 17.0238068115523,
+    "grid_points_per_second": 55157134.06942946,
+    "gpu_memory_used": 1137113339,
+    "metadata": {
+      "julia_version": "1.12.2",
+      "oceananigans_version": "0.113.5",
+      "architecture": "GPU{CUDABackend}",
+      "gpu_name": "NVIDIA TITAN V",
+      "cuda_version": "12.9.0",
+      "cpu_model": "Intel(R) Xeon(R) Silver 4214 CPU @ 2.20GHz (cascadelake)",
+      "num_threads": 8,
+      "hostname": "tartarus",
+      "package_versions": {
+        "Adapt": "4.7.3",
+        "CUDA": "6.1.0",
+        "GPUArrays": "11.5.16",
+        "GPUCompiler": "1.17.1",
+        "KernelAbstractions": "0.9.44",
+        "LLVM": "9.13.2"
+      },
+      "timestamp": "2026-10-08T16:57:03.913"
+    }
+  },
+  {
+    "name": "Nonhydrostatic_FFT_64x64x64_F64_WENO5",
+    "group": "Nonhydrostatic Pressure Solver Sweep",
+    "float_type": "Float64",
+    "grid_size": [
+      64,
+      64,
+      64
+    ],
+    "time_steps": 100,
+    "samples": 1,
+    "Δt": 60,
+    "total_time_seconds": 0.267666316,
+    "time_per_step_seconds": 0.0026766631600000004,
+    "time_per_step_median_seconds": 0.0026766631600000004,
+    "time_per_step_max_seconds": 0.0026766631600000004,
+    "steps_per_second": 373.5994931838939,
+    "grid_points_per_second": 97936865.54119869,
+    "gpu_memory_used": 50322513,
+    "metadata": {
+      "julia_version": "1.12.2",
+      "oceananigans_version": "0.113.5",
+      "architecture": "GPU{CUDABackend}",
+      "gpu_name": "NVIDIA TITAN V",
+      "cuda_version": "12.9.0",
+      "cpu_model": "Intel(R) Xeon(R) Silver 4214 CPU @ 2.20GHz (cascadelake)",
+      "num_threads": 8,
+      "hostname": "tartarus",
+      "package_versions": {
+        "Adapt": "4.7.3",
+        "CUDA": "6.1.0",
+        "GPUArrays": "11.5.16",
+        "GPUCompiler": "1.17.1",
+        "KernelAbstractions": "0.9.44",
+        "LLVM": "9.13.2"
+      },
+      "timestamp": "2026-10-08T16:59:02.757"
+    }
+  },
+  {
+    "name": "Nonhydrostatic_FourierTridiagonal_64x64x64_F64_WENO5",
+    "group": "Nonhydrostatic Pressure Solver Sweep",
+    "float_type": "Float64",
+    "grid_size": [
+      64,
+      64,
+      64
+    ],
+    "time_steps": 100,
+    "samples": 1,
+    "Δt": 60,
+    "total_time_seconds": 0.328057658,
+    "time_per_step_seconds": 0.0032805765799999997,
+    "time_per_step_median_seconds": 0.0032805765799999997,
+    "time_per_step_max_seconds": 0.0032805765799999997,
+    "steps_per_second": 304.8244647286972,
+    "grid_points_per_second": 79907904.4818396,
+    "gpu_memory_used": 104950913,
+    "metadata": {
+      "julia_version": "1.12.2",
+      "oceananigans_version": "0.113.5",
+      "architecture": "GPU{CUDABackend}",
+      "gpu_name": "NVIDIA TITAN V",
+      "cuda_version": "12.9.0",
+      "cpu_model": "Intel(R) Xeon(R) Silver 4214 CPU @ 2.20GHz (cascadelake)",
+      "num_threads": 8,
+      "hostname": "tartarus",
+      "package_versions": {
+        "Adapt": "4.7.3",
+        "CUDA": "6.1.0",
+        "GPUArrays": "11.5.16",
+        "GPUCompiler": "1.17.1",
+        "KernelAbstractions": "0.9.44",
+        "LLVM": "9.13.2"
+      },
+      "timestamp": "2026-10-08T16:59:21.133"
+    }
+  },
+  {
+    "name": "Nonhydrostatic_ConjugateGradient_64x64x64_F64_WENO5",
+    "group": "Nonhydrostatic Pressure Solver Sweep",
+    "float_type": "Float64",
+    "grid_size": [
+      64,
+      64,
+      64
+    ],
+    "time_steps": 100,
+    "samples": 1,
+    "Δt": 60,
+    "total_time_seconds": 2.251904998,
+    "time_per_step_seconds": 0.02251904998,
+    "time_per_step_median_seconds": 0.02251904998,
+    "time_per_step_max_seconds": 0.02251904998,
+    "steps_per_second": 44.40684668705549,
+    "grid_points_per_second": 11640988.417931475,
+    "gpu_memory_used": 67328409,
+    "metadata": {
+      "julia_version": "1.12.2",
+      "oceananigans_version": "0.113.5",
+      "architecture": "GPU{CUDABackend}",
+      "gpu_name": "NVIDIA TITAN V",
+      "cuda_version": "12.9.0",
+      "cpu_model": "Intel(R) Xeon(R) Silver 4214 CPU @ 2.20GHz (cascadelake)",
+      "num_threads": 8,
+      "hostname": "tartarus",
+      "package_versions": {
+        "Adapt": "4.7.3",
+        "CUDA": "6.1.0",
+        "GPUArrays": "11.5.16",
+        "GPUCompiler": "1.17.1",
+        "KernelAbstractions": "0.9.44",
+        "LLVM": "9.13.2"
+      },
+      "timestamp": "2026-10-08T17:00:17.089"
+    }
+  },
+  {
+    "name": "EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr_1x2x1ranks",
+    "group": "Distributed",
+    "float_type": "Float64",
+    "grid_size": [
+      360,
+      180,
+      50
+    ],
+    "time_steps": 100,
+    "samples": 1,
+    "Δt": 60,
+    "total_time_seconds": 4.165719816,
+    "time_per_step_seconds": 0.04165719816,
+    "time_per_step_median_seconds": 0.04165719816,
+    "time_per_step_max_seconds": 0.04165719816,
+    "steps_per_second": 24.005455099479498,
+    "grid_points_per_second": 77808048.32894515,
+    "gpu_memory_used": 638714545,
+    "metadata": {
+      "julia_version": "1.12.2",
+      "oceananigans_version": "0.113.5",
+      "architecture": "Distributed{GPU{CUDABackend}, false, Partition{Int64, Int64, Int64}, Tuple{Int64, Int64, Int64}, Int64, Tuple{Int64, Int64, Int64}, Oceananigans.DistributedComputations.NeighboringRanks{Nothing, Nothing, Int64, Int64, Nothing, Nothing, Nothing, Nothing}, MPI.Comm, Base.Threads.Atomic{UInt64}, Nothing}",
+      "gpu_name": "NVIDIA TITAN V",
+      "cuda_version": "12.9.0",
+      "cpu_model": "Intel(R) Xeon(R) Silver 4214 CPU @ 2.20GHz (cascadelake)",
+      "num_threads": 4,
+      "hostname": "tartarus",
+      "package_versions": {
+        "Adapt": "4.7.3",
+        "CUDA": "6.1.0",
+        "GPUArrays": "11.5.16",
+        "GPUCompiler": "1.17.1",
+        "KernelAbstractions": "0.9.44",
+        "LLVM": "9.13.2"
+      },
+      "timestamp": "2026-10-08T17:07:17.257"
+    }
+  }
+]
