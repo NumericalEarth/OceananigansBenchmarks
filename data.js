@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791433232882,
+  "lastUpdate": 1791479284544,
   "repoUrl": "https://github.com/CliMA/Oceananigans.jl",
   "entries": {
     "Oceananigans.jl Benchmarks": [
@@ -71913,6 +71913,213 @@ window.BENCHMARK_DATA = {
           {
             "name": "Distributed/tripolar 360x180x50 F64/NVIDIA TITAN V/1x1x1",
             "value": 0.05488709548,
+            "unit": "s/timestep"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Xin Kai Lee",
+            "username": "xkykai",
+            "email": "xinkai@mit.edu"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "eb9261e152129a049ba895bba1023edec592337e",
+          "message": "Add a global wind-driven gyres example on a tripolar grid (#5996)\n\n* Fix two Float64 leaks into Float32 kernels (CATKE on Metal)\n\nCloses #5939. `CATKEVerticalDiffusivity` on a Float32 Metal grid failed to compile\nwith `InvalidIRError: unsupported use of double value` for two independent reasons.\n\n1. `Δt` was not demoted to the kernel time type.\n\n`Clock.time` accumulates in Float64 by design, and #5570 introduced\n`kernel_time_type` plus `Adapt.adapt_structure` so that the clock arrives in kernels\nat the grid's precision. `Δt`, however, is a separate scalar argument that the same\nmachinery cannot reach: `aligned_time_step` computes `sim.stop_time - clock.time`,\nwhich promotes an otherwise-Float32 `Δt` to Float64. #5570 handled this with a manual\n`kernel_Δt = convert(eltype(grid), Δt)` at individual launch sites, but\n`step_closure_prognostics!` and `step_lagrangian_particles!` were never covered, so\n`_ab2_substep_turbulent_kinetic_energy!` received `Δτ::Float64`.\n\nAdd `kernel_time_step(clock, Δt)` and apply it once at the top of each `time_step!`,\nso every `Δt` handed to a model carries the kernel time type. Routing through\n`kernel_time_type`/`clock_convert` rather than `eltype(grid)` leaves DateTime clocks\nat Float64 seconds and preserves Reactant's `clock_convert` override.\n\n2. `Base.cbrt(::Float32)` emits double-precision instructions.\n\n`Base._improve_cbrt(::Float32, ::Float32)` performs its Newton refinement in Float64\n(`base/special/cbrt.jl`), so `cbrt` emits doubles even for a Float32 argument. Metal\nhas no Float64 at all, and no native cube-root intrinsic to bind to either --- neither\n`air.cbrt.f32` nor `air.fast_cbrt.f32` exists.\n\nAdd `f32_safe_cbrt`, which falls back to `Base.cbrt`, and override it for Metal in\n`OceananigansMetalExt` using `air.pow.f32` (which `^(::Float32, ::Float32)` lowers to).\nDefining our own function keeps this out of type-piracy territory; a `Base.cbrt`\noverride belongs upstream in Metal.jl. Use it at the two call sites that run in\nkernels, in CATKE and in Smagorinsky.\n\nTests\n=====\n\n`test_time_stepping.jl` gains a unit test for `kernel_time_step` and a regression test\nthat probes the `Δt` handed to the model through the `dynamics` interface of\n`LagrangianParticles`, across all three timesteppers and both model types. Reverting\nonly the source change, it reports `Δt::Float64` for every Float32 configuration.\n\n`test_metal.jl` gains a `f32_safe_cbrt` accuracy check against `Base.cbrt` and the\nreproducer from #5939, which now runs to completion on Metal.\n\nCo-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>\n\n* Address review: trim docstrings and comments, reference Metal.jl#952\n\nPer review, cut the `f32_safe_cbrt` and `kernel_time_step` docstrings back to what\ndoes not go stale, and point at the upstream issue so `f32_safe_cbrt` and its Metal\noverride can be deleted together once it is resolved.\n\nCo-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>\n\n* Note the subnormal limitation of the Metal cbrt override\n\nMetal flushes subnormal operands in arithmetic --- `a * 2^24` and `a + a` both return\nzero for subnormal `a` --- so `air.pow.f32` returns zero for subnormal arguments and no\namount of scaling in Float32 recovers them. That matches every other operation on the\ndevice, and is not reachable via arithmetic anyway, since a subnormal intermediate\nflushes before it can be passed to `f32_safe_cbrt`.\n\nCo-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>\n\n* Shorten the Metal cbrt override comment\n\nCo-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>\n\n* Upstream Breeze's kernel_time_step instead of a clock-based variant\n\nBreeze already defines this helper, and its signature and conversion target are the\nright ones, so move it into Oceananigans verbatim rather than shipping a second\nfunction with the same name and different semantics. Breeze can now drop its copy and\nimport `Oceananigans.Utils: kernel_time_step`.\n\n    @inline kernel_time_step(arch, grid, Δt) = convert(eltype(grid), Δt)\n\n`convert(eltype(grid), Δt)` also matches every pre-existing manual conversion in\nOceananigans, so this is no longer a behavior change, and it fixes two cases the\n`kernel_time_type(clock)` version missed --- on a Float32 grid, `Clock(time=0.0)` and\nDateTime clocks both still handed Float64 to kernels:\n\n    default Clock(grid)          Δt in kernels: Float32   OK\n    Clock(time=0.0)              Δt in kernels: Float64   <-- LEAK\n    Clock(time=0f0)              Δt in kernels: Float32   OK\n    Clock(time=DateTime(2020))   Δt in kernels: Float64   <-- LEAK\n\n`kernel_time_type` describes `Clock.time`, an absolute coordinate that wants\nhigh-precision accumulation; `Δt` is a coefficient multiplying field tendencies and\nwants the grid's precision. Those are different quantities.\n\n`OceananigansReactantExt` gets the `ReactantState` pass-through Breeze needs, since\nconverting outside the kernel breaks tracing.\n\nCo-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>\n\n* Remove redundant Δt conversions and trim comments\n\n`time_step!` now demotes Δt once, so the per-launch-site and in-kernel conversions are\ndead weight that only obscures where the guarantee comes from. Dropped from the\nNonhydrostatic, HydrostaticFreeSurface and ShallowWater step functions, from\n`_ab2_step_field!` and `_rk3_substep_field!`, and from the CATKE and k-epsilon\nsubsteps, along with the `FT` bindings and the `_rk3_substep_field!` type parameter\nthat existed only to serve them.\n\nCallers of `ab2_step!` / `rk3_substep!` outside `time_step!` are now responsible for\npassing a Δt of the grid's precision.\n\nAlso cut the comments and docstrings this branch added back to one or two lines.\n\nCo-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>\n\n* Address review: name the kernel time step, drop the f32_safe_cbrt unit test\n\nPer @giordano, do not reuse the `Δt` label for the converted value --- rebinding it\nmakes the local a `Union{Float32, Float64}` that the compiler then has to resolve. The\nconverted value is now `kernel_Δt`, and `Δt` keeps its original type, which also means\nthe clock ticks and the `Δt != clock.last_Δt` euler test stay in the precision\n`aligned_time_step` produced while only the physics sees the demoted step.\n\nFor RK3 that means a `kernel_*_stage_Δt` alongside each clock stage step, and for\nSplitRK a `kernel_Δτ` alongside `Δτ`. `third_stage_Δt` is dropped, since the clock\nuses `corrected_third_stage_Δt` there and nothing else referenced it.\n\nAlso drop the `f32_safe_cbrt` unit test: the function is temporary, and the CATKE\nsimulation test already exercises it on device.\n\nCo-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>\n\n* Add global wind-driven gyres example on a tripolar grid\n\nA ¼° single-layer z-star global ocean with realistic coastlines from ETOPO1,\nan idealized zonal wind stress, and three planetary rotation rates, showing that\nthe Gulf Stream and Kuroshio transports scale as 1/Ω per Sverdrup theory.\n\nExport `interpolate!` so the example can regrid the ETOPO elevation onto the\ntripolar grid.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\n\n* Keep fΔt fixed across rotation rates in the gyres example\n\nThe Adams-Bashforth stepper blows up at twice Earth's rotation rate with\n30-minute steps, so the time step now scales with 1/Ω.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\n\n* Use real bathymetry and a resolution parameter in the gyres example\n\nThe single layer now follows the ETOPO1 bathymetry through a `PartialCellBottom`\ninstead of a flat 1 km floor, the resolution is a top-level parameter (½° by\ndefault), and the time stepper is `SplitRungeKutta3` with one 30-minute step for\nevery rotation rate.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\n\n* Keep the gyres example layer flat\n\nA single layer over the real bathymetry through a `PartialCellBottom` is\nnumerically unstable: with rotation, a grid-scale mode grows at the Antarctic\nshelf break within days for every advection and Coriolis scheme. The layer is\nflat again, with ETOPO1 setting only the coastlines, at ½° by default.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\n\n* Qualify record in the gyres example\n\nCUDA and CairoMakie both export record.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\n\n* Use one-hour time steps in the gyres example\n\nCo-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>\n\n* Use four layers with grid-fitted bathymetry and add an f-plane run to the gyres example\n\nThe example is now 1° with four z-star layers over ETOPO1 bathymetry\n(`GridFittedBottom`), active temperature with a linear equation of state\nand convective adjustment, a horizontally uniform initial thermocline, and\na 30-day surface temperature restoring. Bottom drag is applied on the\nimmersed boundary as well as the domain bottom. A fourth run on an\n`FPlane` follows the rotation-rate comparison and shows that western\nintensification needs β. Each streamfunction map gets its own colorbar.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\n\n* few simplifications\n\n* minor phrasing tweak\n\n* Rescale the ZWENO α weights so Float32 cannot overflow to NaN\n\nβ and τ both scale with the square of the reconstructed field while ϵ is\nabsolute, so a flat sub-stencil beside a large jump drives τ / (βᵣ + ϵ)\narbitrarily high. In Float32 its square overflows for jumps ≳ 1e5, so α = Inf\nand every normalized weight is NaN. This is reachable from a physical\nsimulation: advecting number concentrations of ~3e5 kg⁻¹ in a Float32 P3\nmicrophysics run produced NaN at the cloud edge.\n\nDivide every αᵣ by M² where M = max(1, τ / dmin) and dmin = minᵣ (βᵣ + ϵ):\n\n    αᵣ / M² = C★ᵣ [a² + (b dmin / dᵣ)²],  a = min(1, dmin/τ),  b = min(1, τ/dmin)\n\nEvery factor is at most one, so no term can overflow at any input magnitude\nand no cutoff has to be chosen. M² is common to all r and the weights are\nnormalized by Σα, so the weights returned are unchanged.\n\nThe limits are the intended ones: τ = 0 gives αᵣ = C★ᵣ, and a τ that overflows\ngives C★ᵣ (dmin / dᵣ)², the ratio the weights tend to. dmin ≥ ϵ > 0, so no\ndenominator can vanish.\n\nCo-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>\n\n* Form the ZWENO rescaling without ever dividing by τ\n\nThe first revision of this rescaling wrote the two factors as min(1, dmin/τ)\nand min(1, τ/dmin). Both divide by τ, which is zero wherever the flow is\nsmooth — that is, nearly everywhere in a real run.\n\nThe values survived, because min(1, dmin/0) is min(1, Inf) = 1, so this did not\nshow up as an error. Two things broke quietly instead. Under\n`BackendOptimizedDivision` the division is `FastMath.div_fast`, where a zero\ndenominator is undefined, and the two kernel configurations in the active-cells\nmap test stopped agreeing on the advected tracer. And reverse-mode Enzyme\ndifferentiating dmin/τ at τ = 0 produced a NaN gradient, so the\nadvection-diffusion Enzyme test returned NaN for its relative error.\n\nWriting a as dmin/max(τ, dmin) gives the same number without dividing by τ, and\nb as min(1, τ/dmin) divides by dmin instead. Both denominators are at least\nϵ > 0 for every input. b is also now correct when τ overflows to Inf, where\nτ/max(τ, dmin) would have been Inf/Inf.\n\nThe overflow case this PR exists to fix is unchanged, and now sums to exactly\none under both dividers rather than 1 - 6e-8 under the fast one.\n\nVerified locally at this commit: `test_active_cells_map` 2823/2823 (matching\nmain, against 2822/1 before), `test_enzyme` advection-diffusion 2/2 (against a\nNaN), and the WENO smoothness tests 18 + 18 + 42 + 800.\n\nCo-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>\n\n* Trim the comments\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\n\n* Detect the architecture and float type in the gyres example\n\nRun on Metal in Float32 on Apple silicon, on CUDA when a GPU is available,\nand on the CPU otherwise.\n\nCo-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>\n\n* Run the gyres example in Float32 with block-averaged bathymetry and a surface-speed animation\n\nEvery architecture now runs in Float32. The ETOPO1 relief is downloaded at three\nsamples per grid cell and averaged in 3 × 3 blocks, and the GridFittedBottom uses the\nInterfaceImmersedCondition so that shelf seas and straits stay open instead of fusing\ncoastlines. The animation shows the surface speed, where the western boundary currents\nare visible, instead of the surface temperature, which stays close to its restoring\nprofile.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\n\n* Drop the half rotation rate run from the gyres example\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\n\n* Avoid using absolute tolerance in tests\n\n* Run the gyres example for a year and animate speed and temperature for all three Coriolis parameters\n\nThe three runs, f = 2Ω sin φ, f = 4Ω sin φ and f = 2Ω sin 30°, now come first and\nlast 360 days. One animation stacks the surface speed and T − T* of the three runs,\nand the streamfunction figure shows all three with the 30°N section. The restoring\nprofile is named restoring_temperature so the saved surface temperature can keep\nits name.\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\n\n* Run the gyres example for five years\n\nCo-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>\n\n* Keep find_λ_range in the grid's float type\n\nOn Julia ≥ 1.12, Float32 `÷` promotes to Float64, which breaks `interpolate!` on Metal.\n\nCo-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>\n\n* Update GPU handling in gyres example\n\n* Avoid sind/cosd in gyres example GPU kernels\n\nJulia computes Float32 sind and cosd in Float64, which Metal cannot compile.\n\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>\n\n* Update examples/global_wind_driven_gyres.jl\n\nCo-authored-by: Mosè Giordano <765740+giordano@users.noreply.github.com>\n\n* Update examples/global_wind_driven_gyres.jl\n\nCo-authored-by: Mosè Giordano <765740+giordano@users.noreply.github.com>\n\n* Convert Δt to the grid float type in implicit_step!\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Add biharmonic viscosity to the gyres example\n\nWithout horizontal viscosity, grid-scale noise builds up in the slow interior\nof the β-plane runs, including a narrow westward jet along one grid column in\nthe North Pacific. A biharmonic viscosity ν = A²/τ with τ = 30 days removes it.\n\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>\n\n* CD-scheme\n\n* Revert \"Merge PR #6067 into the gyres example branch\"\n\nThis reverts commit b8fcf518706fc21d2d55f9c83762d82ad398a1ff, reversing\nchanges made to 987b6287e3ce9bf10a7ab5092833c8e373eafe2f.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Use CDScheme Coriolis in the gyres example and drop the biharmonic viscosity\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* change the scheme\n\n* Apply suggestion from @simone-silvestri\n\n* Apply suggestion from @simone-silvestri\n\n* this  is because of the Adapt\n\n* Zoom the gyres animation on the Gulf Stream and Kuroshio with regridded T − T*\n\nRegrid the surface temperature anomaly conservatively onto ½° latitude-longitude\ngrids with ConservativeRegridding, store it in a FieldTimeSeries per region, and\nplot it with heatmap!.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Use fld for find_λ_range\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Use DualGridScheme in the gyres example\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Use floor(λ / 360) in find_λ_range and mark fld broken on Metal\n\n`fld` on Float32 compiles to Float64 instructions on Julia ≥ 1.12, which Metal rejects.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Revert \"Merge PR #5940 into the gyres example branch\"\n\nThis reverts commit 04af0a89d20567d0e0df0d962553178fde8acab4, reversing\nchanges made to 833dd35e3c478603f8a4656ef09dd185dd179b2e.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Replace the fld @test_broken with a TODO at find_λ_range\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Fix interpolate! on Metal for Float32 LatitudeLongitudeGrid\n\n`find_λ_range` uses `floor(λ / 360)`: on Julia ≥ 1.12, `÷` and `fld` on Float32\ncompile to Float64 instructions, which Metal rejects (JuliaGPU/Metal.jl#972).\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Sort the imports in the Metal tests\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Drop the interpolate! import from the Metal tests, now that it is exported\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Restore the sorted interpolate! import in the Metal tests\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Remove the unused biharmonic viscosity from the gyres example\n\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>\n\n* Apply suggestion from @navidcy\n\n* Apply batched suggestions from code review\n\nCo-authored-by: Navid C. Constantinou <navidcy@users.noreply.github.com>\n\n* Apply suggestion from @navidcy\n\n* Update examples/global_wind_driven_gyres.jl\n\nCo-authored-by: Navid C. Constantinou <navidcy@users.noreply.github.com>\n\n* Read ETOPO1 for the gyres example from NCEI's OPeNDAP server\n\nThe CoastWatch ERDDAP server at pfeg.noaa.gov is unreachable, which broke\nthe docs build. NCEI's THREDDS server hosts the same ETOPO1 ice-surface\ngrid, and a strided OPeNDAP read returns identical values.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Fit the gyres example's wind stress to the observed zonal-mean stress\n\nFour Gaussian belts (trades at 18°N and 17°S, westerlies at 46°N and 51°S)\nfit the NCEP/NCAR 1991-2020 annual- and zonal-mean ocean wind stress to\nwithin 0.01 N m⁻². The sin 2φ sin 6φ profile vanished on the equator, had\npolar easterlies four times too strong and equal westerlies in both\nhemispheres.\n\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>\n\n* Describe the gyres example's wind belts without fit details\n\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>\n\n* Clarify GPU and regridding requirements in comments\n\nUpdated comments to clarify GPU requirements and regridding process.\n\n* Drop the 30°N streamfunction line plot from the gyres example\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Compare the gyres example at half Earth's rotation rate instead of twice\n\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>\n\n* Drop the Sverdrup lines from the gyres example's transport plot\n\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>\n\n* Run the gyres example for six years\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Match the gyres example's text to the runs with fitted winds and half rotation\n\nCo-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Gregory Wagner <glwagner@Gregorys-MacBook-Pro.local>\nCo-authored-by: Claude Opus 5 (1M context) <noreply@anthropic.com>\nCo-authored-by: Gregory L. Wagner <wagner.greg@gmail.com>\nCo-authored-by: Gregory L. Wagner <gregory.leclaire.wagner@gmail.com>\nCo-authored-by: Navid C. Constantinou <navidcy@users.noreply.github.com>\nCo-authored-by: mason <masonlee27@icloud.com>\nCo-authored-by: Mason Lee <masonlee942@gmail.com>\nCo-authored-by: Mosè Giordano <mose@gnu.org>\nCo-authored-by: Mosè Giordano <765740+giordano@users.noreply.github.com>\nCo-authored-by: Simone Silvestri <silvestri.simone0@gmail.com>",
+          "timestamp": "2026-10-08T16:11:53Z",
+          "url": "https://github.com/CliMA/Oceananigans.jl/commit/eb9261e152129a049ba895bba1023edec592337e"
+        },
+        "date": 1791479283970,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Default/tripolar 360x180x50 F64/NVIDIA TITAN V/default",
+            "value": 0.05489003839000001,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gu_",
+            "value": 2.399984,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gv_",
+            "value": 2.296849,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__rk_substep_turbulent_kinetic_energy_",
+            "value": 1.985459,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_CATKE_closure_fields_",
+            "value": 1.4814785,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.946426,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.94265,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.937274,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_w_from_continuity_",
+            "value": 0.320926,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_TKE_diffusivity_",
+            "value": 0.595996,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_split_explicit_transport_velocities_",
+            "value": 0.453341,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/180x90x50",
+            "value": 0.01649143258,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/720x360x50",
+            "value": 0.21196955178,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F32",
+            "value": 0.03303310015,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/nothing",
+            "value": 0.03261213985,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+Biharmonic",
+            "value": 0.07976156543,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+GM+Biharmonic",
+            "value": 0.24870945483,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/nothing+nothing",
+            "value": 0.03656090608,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant5+WENO5",
+            "value": 0.04942948843,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant9+WENO9",
+            "value": 0.07285137039,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon_zstar",
+            "value": 0.06860504324,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon_zstar",
+            "value": 0.06344721095,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar_zstar",
+            "value": 0.06165104455,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon",
+            "value": 0.05632334369,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon",
+            "value": 0.056559993860000005,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/3 tracers",
+            "value": 0.0587412681,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Nonhydrostatic Pressure Solver Sweep/Nonhydrostatic_FFT_64x64x64_F64_WENO5/NVIDIA TITAN V/64x64x64",
+            "value": 0.0026766631600000004,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Nonhydrostatic Pressure Solver Sweep/Nonhydrostatic_FourierTridiagonal_64x64x64_F64_WENO5/NVIDIA TITAN V/64x64x64",
+            "value": 0.0032805765799999997,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Nonhydrostatic Pressure Solver Sweep/Nonhydrostatic_ConjugateGradient_64x64x64_F64_WENO5/NVIDIA TITAN V/64x64x64",
+            "value": 0.02251904998,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Distributed/tripolar 360x180x50 F64/NVIDIA TITAN V/1x2x1",
+            "value": 0.04165719816,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/360x180x50",
+            "value": 0.05489003839000001,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F64",
+            "value": 0.05489003839000001,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE",
+            "value": 0.05489003839000001,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariantDefault+WENO7",
+            "value": 0.05489003839000001,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar",
+            "value": 0.05489003839000001,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
+            "value": 0.05489003839000001,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Distributed/tripolar 360x180x50 F64/NVIDIA TITAN V/1x1x1",
+            "value": 0.05489003839000001,
             "unit": "s/timestep"
           }
         ]
