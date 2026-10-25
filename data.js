@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792897161269,
+  "lastUpdate": 1792900913256,
   "repoUrl": "https://github.com/CliMA/Oceananigans.jl",
   "entries": {
     "Oceananigans.jl Benchmarks": [
@@ -87231,6 +87231,213 @@ window.BENCHMARK_DATA = {
           {
             "name": "Distributed/tripolar 360x180x50 F64/NVIDIA TITAN V/1x1x1",
             "value": 0.04995557108,
+            "unit": "s/timestep"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Benoît Pasquier",
+            "username": "briochemc",
+            "email": "4486578+briochemc@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "b04bc1846178bab5bd7b3e22af272d7bcb90f180",
+          "message": "Fix on_architecture for ImmersedBoundaryGrid on distributed grids (#5628)\n\n* Fix on_architecture for ImmersedBoundaryGrid on distributed grids\n\n`on_architecture(arch, ::IBG)` previously routed through the public\n`ImmersedBoundaryGrid(grid, ib)` constructor, which re-runs\n`materialize_immersed_boundary` and builds a fresh `Field{Center, Center,\nNothing}(grid)` on the arch-converted grid. When the original IBG wraps a\ny-partitioned distributed `TripolarGrid`, middle ranks carry\n`TY = FullyConnected`; the freshly-serial CPU grid produced by\n`on_architecture(arch, grid)` is no longer `<:DistributedGrid`, so\n`inject_halo_communication_boundary_conditions` is skipped and the\n`FullyConnected` south defaults to `MultiRegionCommunicationBoundaryCondition`\nvia `default_prognostic_bc`. The subsequent `fill_halo_regions!` then fires\n`MultiRegionFillHalo{South}` on a `Nothing` `bc.condition` and crashes with\n`FieldError: type Nothing has no field rank`. Only 1×N≥3 partitions trigger\nit (end ranks take the `*Connected` → `NoFluxBoundaryCondition` branch).\n\nThe same buggy pattern lived in `on_architecture(arch, ::GridFittedBottom{<:Field})`\n(which additionally called `fill_halo_regions!`) and in\n`on_architecture(arch, ::PartialCellBottom{<:Field})`.\n\nFix:\n- `IBG.on_architecture`: skip `materialize_immersed_boundary`. The IBG is\n  already materialized, so use the internal `ImmersedBoundaryGrid{TX, TY,\n  TZ}(grid, ib, mi, ms)` constructor and arch-convert all four fields\n  directly, including the active-cell maps.\n- `GridFittedBottom{<:Field}.on_architecture` and\n  `PartialCellBottom{<:Field}.on_architecture`: delegate to\n  `on_architecture(arch, ib.bottom_height)` (the standard `Field` overload\n  at `Fields/field.jl:459`), which preserves the original boundary\n  conditions and copies data including halos — no re-derivation of defaults\n  on a freshly-serial grid, no `fill_halo_regions!`.\n\nCloses #5627.\n\n* Test on_architecture for distributed ImmersedBoundaryGrids\n\nMoves immersed grids on a Partition(1, 4), whose middle ranks are FullyConnected\nin y, to CPU() and to cpu_architecture(arch), and checks that the bottom heights\nand the active cells map are kept.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Navid C. Constantinou <navidcy@users.noreply.github.com>\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-25T03:20:12Z",
+          "url": "https://github.com/CliMA/Oceananigans.jl/commit/b04bc1846178bab5bd7b3e22af272d7bcb90f180"
+        },
+        "date": 1792900912773,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Default/tripolar 360x180x50 F64/NVIDIA TITAN V/default",
+            "value": 0.049987999649999997,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gu_",
+            "value": 2.3565605,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gv_",
+            "value": 2.203217,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__rk_substep_turbulent_kinetic_energy_",
+            "value": 1.929011,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.92697,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.918009,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.91593,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_CATKE_closure_fields_",
+            "value": 0.7874185,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_TKE_diffusivity_",
+            "value": 0.612667,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_w_from_continuity_",
+            "value": 0.192414,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_broadcast_kernel_cartesian",
+            "value": 0.004864,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/180x90x50",
+            "value": 0.01575692699,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/720x360x50",
+            "value": 0.19235336166,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F32",
+            "value": 0.02863335168,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/nothing",
+            "value": 0.028897938239999997,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+Biharmonic",
+            "value": 0.060970704800000004,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+GM+Biharmonic",
+            "value": 0.21436965945,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/nothing+nothing",
+            "value": 0.031814049340000004,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant5+WENO5",
+            "value": 0.044450756130000005,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant9+WENO9",
+            "value": 0.06211238783,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon_zstar",
+            "value": 0.06560138669,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon_zstar",
+            "value": 0.058635358389999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar_zstar",
+            "value": 0.055890218230000004,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon",
+            "value": 0.05315187998,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon",
+            "value": 0.05167633796,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/3 tracers",
+            "value": 0.0538166131,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Nonhydrostatic Pressure Solver Sweep/Nonhydrostatic_FFT_64x64x64_F64_WENO5/NVIDIA TITAN V/64x64x64",
+            "value": 0.00245462652,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Nonhydrostatic Pressure Solver Sweep/Nonhydrostatic_FourierTridiagonal_64x64x64_F64_WENO5/NVIDIA TITAN V/64x64x64",
+            "value": 0.00246025802,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Nonhydrostatic Pressure Solver Sweep/Nonhydrostatic_ConjugateGradient_64x64x64_F64_WENO5/NVIDIA TITAN V/64x64x64",
+            "value": 0.011025683139999999,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Distributed/tripolar 360x180x50 F64/NVIDIA TITAN V/1x2x1",
+            "value": 0.036505223180000004,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/360x180x50",
+            "value": 0.049987999649999997,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F64",
+            "value": 0.049987999649999997,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE",
+            "value": 0.049987999649999997,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariantDefault+WENO7",
+            "value": 0.049987999649999997,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar",
+            "value": 0.049987999649999997,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
+            "value": 0.049987999649999997,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Distributed/tripolar 360x180x50 F64/NVIDIA TITAN V/1x1x1",
+            "value": 0.049987999649999997,
             "unit": "s/timestep"
           }
         ]
