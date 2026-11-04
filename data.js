@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793828499913,
+  "lastUpdate": 1793831271425,
   "repoUrl": "https://github.com/CliMA/Oceananigans.jl",
   "entries": {
     "Oceananigans.jl Benchmarks": [
@@ -100065,6 +100065,213 @@ window.BENCHMARK_DATA = {
           {
             "name": "Distributed/tripolar 360x180x50 F64/NVIDIA TITAN V/1x1x1",
             "value": 0.04772937283,
+            "unit": "s/timestep"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Gregory L. Wagner",
+            "username": "glwagner",
+            "email": "wagner.greg@gmail.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "4326b55f6310b6072899557d36c3b2d739060279",
+          "message": "Split StokesDrift: function-mode StokesDrift + Field-mode FieldStokesDrift (#5624)\n\n* Split StokesDrift into function/Field variants, FieldStokesDrift\n\nSplits the Stokes-drift abstraction into two concrete subtypes of a new\n`AbstractStokesDrift` supertype:\n\n- **`StokesDrift`** (function mode, fully backward-compatible): all\n  derivative slots are callables `f(x, y, z, t[, params])`. Restored to\n  its original 10-parameter form; no `uˢ, vˢ, wˢ` slots, no Field\n  dispatch, no validation. Existing user code is unchanged.\n\n- **`FieldStokesDrift`** (Field mode): six prognostic Field slots\n  (`uˢ, vˢ, wˢ, ∂t_uˢ, ∂t_vˢ, ∂t_wˢ`) at the C-grid velocity locations\n  for couplings where the Stokes drift comes from an external wave model.\n\n```julia\nsd = FieldStokesDrift(grid)                          # all six Fields default-allocated\nsd = FieldStokesDrift(grid; uˢ=my_uˢ_field)          # override individual slots\nNonhydrostaticModel(grid; stokes_drift=sd, ...)\n```\n\nThe 7-parameter `FieldStokesDrift` struct stores only the Field slots —\nno dead `zerofunction` placeholders. The per-slot kwarg constructor\ndefaults each missing argument to a freshly-allocated `Field` at the\nmatching staggered location, so callers can share Fields with other\ncode by overriding individual kwargs.\n\n## Behavior\n\n- Spatial derivatives in `x_curl_Uˢ_cross_U, y_curl_Uˢ_cross_U,\n  z_curl_Uˢ_cross_U` are computed inline from the stored\n  `uˢ, vˢ, wˢ` Fields via the staggered FD operators\n  (`∂xᶠᶠᶜ, ∂yᶠᶠᶜ, ∂zᶠᶜᶠ, ∂zᶜᶠᶠ, ∂xᶠᶜᶠ, ∂yᶜᶠᶠ` + `ℑ` interpolators).\n  Both `∂z uˢ, ∂z vˢ` and the cross-derivative terms `∂y uˢ, ∂x vˢ`\n  participate.\n- `∂t_uˢ, ∂t_vˢ, ∂t_wˢ` are read directly via `getindex` at the\n  velocity location.\n- `compute_stokes_drift!(::FieldStokesDrift, grid)` fills `wˢ` and\n  `∂t_wˢ` by vertical integration of `∂_z wˢ = -∂_x uˢ - ∂_y vˢ`\n  (same continuity pattern as the hydrostatic model's\n  `compute_w_from_continuity!`), starting from zero at the bottom.\n  No-op on `StokesDrift` and `UniformStokesDrift`.\n- `NonhydrostaticModel.update_state!` invokes `compute_stokes_drift!`\n  between the velocity halo fill and auxiliary-field computation, so\n  `wˢ` and `∂t_wˢ` are always in sync with `uˢ, vˢ, ∂t_uˢ, ∂t_vˢ`.\n\n## Shared structure\n\nThe three `*_curl_Uˢ_cross_U` methods share a single body (the\n`(∇×uˢ) × uᴱ` algebra) and dispatch on\n`Union{StokesDrift, FieldStokesDrift}`; per-derivative `_∂{x,y,z}_{u,v,w}ˢ_*`\nhelpers branch on the concrete type. `UniformStokesDrift` retains its\nown specialized curl-cross methods because it has a simpler structure.\n\n## Tests\n\n`test/test_stokes_drift.jl` gains a `FieldStokesDrift` testset that\ncovers:\n\n- All six Field slots allocated by `FieldStokesDrift(grid)` at the\n  expected staggered locations.\n- Per-slot kwarg override: pass one Field, the others default.\n- Zero state gives zero contributions.\n- Linear vertical shear `uˢ = α·z`, uniform `w = W` →\n  `x_curl_Uˢ_cross_U = W·α` at every interior point.\n- Cross-derivative term `uˢ = β·y, v = V` → `V·β` (the term\n  `UniformStokesDrift` drops).\n- `∂t_uˢ, ∂t_vˢ` read directly with the right sign.\n- `compute_stokes_drift!` fills `wˢ` from continuity when\n  `uˢ, vˢ` have nonzero divergence.\n- `compute_stokes_drift!` is a no-op on function-mode `StokesDrift`.\n\nAll 326 Stokes-drift tests pass.\n\nMotivation: developed against the wind-drift instability example in\nNumericalEarth/Ripple.jl, where the wave-model pseudomomentum\n`p(z) = Q(z)·A·K` equals the deep-water Stokes drift when the wave\naction is calibrated to the target steepness, and the analytic\npseudomomentum tendency `Q(z)·∂t(A·K)` equals the Stokes acceleration\nthe ocean must see for the wave-mean energy budget to close.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\n\n* Fill the halos of the Stokes drift Fields in compute_stokes_drift!\n\nThe vortex force differentiates wˢ horizontally, which reads its halos at\ni = 1 and j = 1, and the continuity integral reads the halos of uˢ and vˢ at\ni = Nx and j = Ny. Neither was filled, so ∂x wˢ at i = 1 was about half its\nvalue for a periodic uˢ = A cos(kx).\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Document compute_stokes_drift! and doctest FieldStokesDrift\n\ncompute_stokes_drift! is exported, so it needs a docstring for the docs build\n(checkdocs = :exports), and the FieldStokesDrift example is now a jldoctest.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Drop the leading underscore from the Stokes drift derivative helpers\n\nA leading underscore is reserved for kernels.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Evaluate ∂x wˢ and ∂y wˢ at the right location for FieldStokesDrift\n\nThe Field-mode helpers for ∂x wˢ and ∂y wˢ always returned them at (f, c, c)\nand (c, f, c), but z_curl_Uˢ_cross_U needs them at (c, c, f), so its ∂x wˢ and\n∂y wˢ terms were half a cell off in z. Split both into location-suffixed\nhelpers like the other derivatives. Function mode is unchanged: it evaluates\nat the same nodes it was given before.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Test time stepping a NonhydrostaticModel with a FieldStokesDrift\n\nChanges uˢ, vˢ between time steps and checks that update_state! recomputes\nwˢ from continuity, and that a uniform ∂t_uˢ accelerates the flow uniformly.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>\nCo-authored-by: Navid C. Constantinou <navidcy@users.noreply.github.com>",
+          "timestamp": "2026-11-04T21:01:12Z",
+          "url": "https://github.com/CliMA/Oceananigans.jl/commit/4326b55f6310b6072899557d36c3b2d739060279"
+        },
+        "date": 1793831270734,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Default/tripolar 360x180x50 F64/NVIDIA TITAN V/default",
+            "value": 0.047725419320000004,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gu_",
+            "value": 2.196818,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gv_",
+            "value": 2.116019,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__rk_substep_turbulent_kinetic_energy_",
+            "value": 1.794581,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.891002,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.887099,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.883578,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_CATKE_closure_fields_",
+            "value": 0.667292,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_TKE_diffusivity_",
+            "value": 0.487837,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_w_from_continuity_",
+            "value": 0.196383,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_broadcast_kernel_cartesian",
+            "value": 0.004928,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/180x90x50",
+            "value": 0.01426319894,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/720x360x50",
+            "value": 0.188497869,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F32",
+            "value": 0.02600533489,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/nothing",
+            "value": 0.028205661950000002,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+Biharmonic",
+            "value": 0.051651839490000004,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+GM+Biharmonic",
+            "value": 0.14682756252,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/nothing+nothing",
+            "value": 0.031472460949999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant5+WENO5",
+            "value": 0.04321766609,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant9+WENO9",
+            "value": 0.057950398380000004,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon_zstar",
+            "value": 0.057031135309999995,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon_zstar",
+            "value": 0.05427765315,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar_zstar",
+            "value": 0.05362894187,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon",
+            "value": 0.04785270254,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon",
+            "value": 0.04783176956,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/3 tracers",
+            "value": 0.051681849099999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Nonhydrostatic Pressure Solver Sweep/Nonhydrostatic_FFT_64x64x64_F64_WENO5/NVIDIA TITAN V/64x64x64",
+            "value": 0.00231672732,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Nonhydrostatic Pressure Solver Sweep/Nonhydrostatic_FourierTridiagonal_64x64x64_F64_WENO5/NVIDIA TITAN V/64x64x64",
+            "value": 0.00223954659,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Nonhydrostatic Pressure Solver Sweep/Nonhydrostatic_ConjugateGradient_64x64x64_F64_WENO5/NVIDIA TITAN V/64x64x64",
+            "value": 0.01028610622,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Distributed/tripolar 360x180x50 F64/NVIDIA TITAN V/1x2x1",
+            "value": 0.03536153593,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/360x180x50",
+            "value": 0.047725419320000004,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F64",
+            "value": 0.047725419320000004,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE",
+            "value": 0.047725419320000004,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariantDefault+WENO7",
+            "value": 0.047725419320000004,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar",
+            "value": 0.047725419320000004,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
+            "value": 0.047725419320000004,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Distributed/tripolar 360x180x50 F64/NVIDIA TITAN V/1x1x1",
+            "value": 0.047725419320000004,
             "unit": "s/timestep"
           }
         ]
