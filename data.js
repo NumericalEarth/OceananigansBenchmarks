@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795673601820,
+  "lastUpdate": 1795699890795,
   "repoUrl": "https://github.com/CliMA/Oceananigans.jl",
   "entries": {
     "Oceananigans.jl Benchmarks": [
@@ -113727,6 +113727,213 @@ window.BENCHMARK_DATA = {
           {
             "name": "Distributed/tripolar 360x180x50 F64/NVIDIA TITAN V/1x1x1",
             "value": 0.04793271527,
+            "unit": "s/timestep"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Andreas Klocker",
+            "username": "aklocker42",
+            "email": "andreas.klocker@beyondthesump.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "0fe91f3a55faafa0ff3c80a9461f79e30d31f6c0",
+          "message": "Hydrostatic dynamics beneath an immersed top (#6162)\n\n* Hydrostatic dynamics beneath an immersed top\n\nPorts the hydrostatic layer onto the index-based geometry: advective\nfluxes, w from continuity, the free-surface solvers and the z★ chain\nrule beneath an immersed top, with the chain-rule ∂z averaged over\nactive faces.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Close faces between staggered partial cells beneath an immersed top\n\nWhere a top cell faces a bottom cell, face spacings use the overlap of\ntheir wet intervals, and faces whose overlap is below the minimum\nfractional cell height are peripheral and have zero column depth.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Stretch moving face depths with their columns beneath an immersed top\n\nBeneath an immersed top, adjacent columns can differ in static depth by far\nmore than the face between them. The moving face depth h + (η⁻ + η⁺)/2 then\nvanishes or turns negative when the free surface of the deeper column drops by\nmore than the face height, e.g. under a regrowing load, and the split-explicit\ncorrector divides by it. The moving face depth now scales the static face depth\nby the mean stretching (h + η)/h of the adjacent columns, which keeps it\npositive and reduces to the previous rule when the adjacent static depths are\nequal. Grids without an immersed top are unchanged.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Simplify immersed-boundary operator methods for immersed tops\n\nCollapse the per-column operator methods for immersed tops into the generic\nconditional-difference path, keeping a single `inactive_node` override for\nthe free-surface face. Barotropic transport divergences `δxᶜᶜᵃ`/`δyᶜᶜᵃ`\nbeneath an immersed top are masked at k = Nz + 1, so `∂t_σ` and the\nsplit-explicit η substep see the full column transport divergence.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Restore wet-overlap face spacing between staggered partial cells\n\nWhere a top cell faces a bottom cell, face spacings Δrᶠᶜᶜ/Δrᶜᶠᶜ and their\nreciprocals are the overlap of the two wet intervals rather than the smaller\ncell spacing, consistent with the face column depth. Bottom-only grids are\nnever staggered, so a single set of helpers serves both boundary types.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Remove trailing blank line in mask_immersed_field.jl\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Remove stale δxᶜᶜᶜ/δyᶜᶜᶜ imports and qualify the peripheral_node extension\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Drop the δxᶜᶜᶜ/δyᶜᶜᶜ imports left unused in SplitExplicitFreeSurfaces\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Drop redundant horizontal immersed-top flux masks; simplify δxᶜᶜᵃ beneath a top\n\nu and v already vanish on peripheral faces, so only the vertical advective\ntracer flux needs masking at an immersed top. The column divergence beneath\na top now evaluates δxᶜᶜᶠ / δyᶜᶜᶠ at Nz + 1 directly, and an unused\nstatement in the σ computation is removed.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Address review: barotropic δx_U/δy_V helpers, one-line methods, shared active_∂z\n\nMove the immersed-top routing of barotropic transport differences out of the\ngeneral δxᶜᶜᵃ/δyᶜᶜᵃ operators into δx_U/δy_V in HydrostaticFreeSurfaceModels.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Test immersed-top dynamics with extend_halos = false\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Use plain δxᶜᵃᵃ/δyᵃᶜᵃ for barotropic transport divergence\n\nBarotropic transports into land or covered columns are zero in the\nimplicit (PCG/FFT), explicit and z★ ∂t_σ paths, so the free-surface\ndivergence there needs no immersed-boundary masking. The split-explicit\nfill-halos path keeps δx_U/δy_V: after halo filling, U is 0/0 at\nland-masked tripolar fold poles and must be masked.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Use the same immersed masking on both split-explicit halo paths\n\nThe fill-halos path now masks the η gradient and the transport\ndivergence the same way as the extend-halos path (`∂xᵣTᶠᶜᶠ`,\n`δxTᶜᵃᵃ`), differing only in using non-topology-aware stencils.\nThis replaces the immersed-top `δx_U`/`δy_V` reroute to `Nz + 1`.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-26T12:46:40Z",
+          "url": "https://github.com/CliMA/Oceananigans.jl/commit/0fe91f3a55faafa0ff3c80a9461f79e30d31f6c0"
+        },
+        "date": 1795699890279,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Default/tripolar 360x180x50 F64/NVIDIA TITAN V/default",
+            "value": 0.04792705391,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gu_",
+            "value": 2.1945295,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gv_",
+            "value": 2.126738,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__rk_substep_turbulent_kinetic_energy_",
+            "value": 1.797076,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.879419,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.877178,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_hydrostatic_free_surface_Gc_",
+            "value": 0.877114,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_CATKE_closure_fields_",
+            "value": 0.655484,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_compute_TKE_diffusivity_",
+            "value": 0.491548,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu__compute_w_from_continuity_",
+            "value": 0.195358,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "NSYS Kernels/EarthOcean_tripolar_360x180x50_F64_WENOVectorInvariantDefault_WENO7_CATKE_2tr/NVIDIA TITAN V/gpu_broadcast_kernel_cartesian",
+            "value": 0.0051045,
+            "unit": "ms (median GPU time)"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/180x90x50",
+            "value": 0.014277383610000001,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/720x360x50",
+            "value": 0.18830178077999998,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F32",
+            "value": 0.02582470491,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/nothing",
+            "value": 0.028325238330000002,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+Biharmonic",
+            "value": 0.05309263497,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE+GM+Biharmonic",
+            "value": 0.14732281188,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/nothing+nothing",
+            "value": 0.03178415649,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant5+WENO5",
+            "value": 0.04356196353,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariant9+WENO9",
+            "value": 0.058118478710000004,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon_zstar",
+            "value": 0.05781648495,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon_zstar",
+            "value": 0.05467540793,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar_zstar",
+            "value": 0.053771772169999996,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/lat_lon",
+            "value": 0.04836534278,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/immersed_lat_lon",
+            "value": 0.04787195906,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/3 tracers",
+            "value": 0.05180374527,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Nonhydrostatic Pressure Solver Sweep/Nonhydrostatic_FFT_64x64x64_F64_WENO5/NVIDIA TITAN V/64x64x64",
+            "value": 0.0023072744300000002,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Nonhydrostatic Pressure Solver Sweep/Nonhydrostatic_FourierTridiagonal_64x64x64_F64_WENO5/NVIDIA TITAN V/64x64x64",
+            "value": 0.00225521972,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Nonhydrostatic Pressure Solver Sweep/Nonhydrostatic_ConjugateGradient_64x64x64_F64_WENO5/NVIDIA TITAN V/64x64x64",
+            "value": 0.01027412229,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Distributed/tripolar 360x180x50 F64/NVIDIA TITAN V/1x2x1",
+            "value": 0.03529961209,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Resolution Sweep/tripolar F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/360x180x50",
+            "value": 0.04792705391,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Float Type Sweep/tripolar 360x180x50 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/F64",
+            "value": 0.04792705391,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Closure Sweep/tripolar 360x180x50 F64 WENOVectorInvariantDefault+WENO7/NVIDIA TITAN V/CATKE",
+            "value": 0.04792705391,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Advection Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/WENOVectorInvariantDefault+WENO7",
+            "value": 0.04792705391,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Grid Type Sweep/360x180x50 F64 WENOVectorInvariantDefault+WENO7 CATKE/NVIDIA TITAN V/tripolar",
+            "value": 0.04792705391,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Tracer Count Sweep/tripolar 360x180x50 F64 CATKE/NVIDIA TITAN V/2 tracers",
+            "value": 0.04792705391,
+            "unit": "s/timestep"
+          },
+          {
+            "name": "Distributed/tripolar 360x180x50 F64/NVIDIA TITAN V/1x1x1",
+            "value": 0.04792705391,
             "unit": "s/timestep"
           }
         ]
